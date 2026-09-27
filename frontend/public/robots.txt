@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /my-items
+Disallow: /requests
+Disallow: /wishlist
+Disallow: /list-item
+Disallow: /profile
+
+Sitemap: https://borrowbox.com/sitemap.xml

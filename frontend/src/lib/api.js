@@ -1,8 +1,14 @@
 import axios from 'axios';
 
+/**
+ * The API client talks to a relative "/api" path so the Vite dev server (and
+ * any reverse proxy in production) can forward requests to the backend. That
+ * keeps the browser preview working without exposing localhost ports.
+ */
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use((config) => {
@@ -12,22 +18,29 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+
+    if (status === 401) {
       localStorage.removeItem('borrowbox_token');
       localStorage.removeItem('borrowbox_user');
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
-      }
+
+      const { pathname } = window.location;
+      const isAuthPage = pathname.includes('/login') || pathname.includes('/register');
+      if (!isAuthPage) window.location.assign('/login');
     }
-    return Promise.reject(err);
-  }
+
+    if (!error.response) {
+      error.friendlyMessage = 'Network unavailable. Check your connection and try again.';
+    }
+
+    return Promise.reject(error);
+  },
 );
 
 export default api;
 
-// API Helpers
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),

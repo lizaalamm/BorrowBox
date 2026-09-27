@@ -1,24 +1,45 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, Star, MapPin, Clock, Shield, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { Heart, Star, MapPin, BadgeCheck, Repeat2, Tag } from 'lucide-react';
 import { wishlistAPI } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
-export default function ItemCard({ item, index = 0 }) {
-  const { user } = useAuth();
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
+const CONDITION_TONES = {
+  New: 'bg-emerald-500',
+  'Like New': 'bg-cyan-500',
+  Good: 'bg-amber-500',
+  Fair: 'bg-zinc-500',
+};
 
-  const toggleWishlist = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+const AVAILABILITY_TONES = {
+  available: { label: 'Available', className: 'bg-emerald-500/95 text-white' },
+  borrowed: { label: 'On loan', className: 'bg-amber-500/95 text-white' },
+  reserved: { label: 'Reserved', className: 'bg-brand-600/95 text-white' },
+  unavailable: { label: 'Unavailable', className: 'bg-zinc-900/85 text-white' },
+};
+
+export default function ItemCard({ item, index = 0, initiallyWishlisted = false }) {
+  const { user } = useAuth();
+  const [isWishlisted, setIsWishlisted] = useState(initiallyWishlisted);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const availability = AVAILABILITY_TONES[item.availability] || AVAILABILITY_TONES.unavailable;
+
+  const toggleWishlist = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
     if (!user) {
-      toast.error('Please sign in to save items');
+      toast.error('Sign in to save items to your wishlist');
       return;
     }
+    if (saving) return;
+
     try {
+      setSaving(true);
       if (isWishlisted) {
         await wishlistAPI.remove(item.id);
         setIsWishlisted(false);
@@ -26,143 +47,144 @@ export default function ItemCard({ item, index = 0 }) {
       } else {
         await wishlistAPI.add(item.id);
         setIsWishlisted(true);
-        toast.success('Added to wishlist ❤️');
+        toast.success('Saved to wishlist');
       }
-    } catch (err) {
-      if (err.response?.data?.message?.includes('Already')) {
-        setIsWishlisted(true);
-      }
-    }
-  };
-
-  const getConditionColor = (cond) => {
-    switch(cond) {
-      case 'New': return 'bg-emerald-500';
-      case 'Like New': return 'bg-cyan-500';
-      case 'Good': return 'bg-amber-500';
-      default: return 'bg-zinc-500';
+    } catch (error) {
+      if (error.response?.status === 400) setIsWishlisted(true);
+      else toast.error(error.response?.data?.message || 'Could not update your wishlist');
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-      whileHover={{ y: -6 }}
-      className="group relative"
+    <motion.article
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ delay: Math.min(index * 0.05, 0.3), duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="group h-full"
     >
-      <Link to={`/items/${item.id}`} className="block">
-        <div className="relative overflow-hidden rounded-[24px] bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 shadow-[0_4px_24px_rgba(0,0,0,0.04)] group-hover:shadow-[0_20px_60px_rgba(0,0,0,0.12)] transition-all duration-500">
-          {/* Image */}
-          <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-            {!imgLoaded && <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 animate-pulse" />}
-            <img
-              src={item.images?.[0]}
-              alt={item.title}
-              className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-              onLoad={() => setImgLoaded(true)}
-            />
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            
-            {/* Top badges */}
-            <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
-              <div className="flex flex-col gap-2">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase text-white shadow-lg ${getConditionColor(item.condition)}`}>
-                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  {item.condition}
-                </span>
-                {item.featured && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-zinc-900 text-white shadow-lg">
-                    <Zap className="w-3 h-3" /> FEATURED
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={toggleWishlist}
-                className={`w-9 h-9 rounded-full backdrop-blur-xl flex items-center justify-center transition-all shadow-lg border ${
-                  isWishlisted 
-                    ? 'bg-red-500 border-red-500 text-white scale-110' 
-                    : 'bg-white/90 dark:bg-zinc-900/90 border-white/20 dark:border-zinc-700/50 text-zinc-700 dark:text-zinc-300 hover:scale-110'
-                }`}
-              >
-                <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-white' : ''}`} />
-              </button>
-            </div>
+      <Link
+        to={`/items/${item.id}`}
+        className="card card-hover flex h-full flex-col overflow-hidden focus-visible:ring-2 focus-visible:ring-brand-600/50"
+      >
+        <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+          {!imgLoaded && <div className="skeleton absolute inset-0 rounded-none" />}
+          <img
+            src={item.images?.[0]}
+            alt={item.title}
+            loading="lazy"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgLoaded(true)}
+            className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.04] ${
+              imgLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
 
-            {/* Bottom quick info */}
-            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-              <span className={`px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-xl border shadow-lg flex items-center gap-1.5 ${
-                item.availability === 'available' 
-                  ? 'bg-emerald-500/90 border-emerald-400/50 text-white' 
-                  : item.availability === 'borrowed'
-                  ? 'bg-amber-500/90 border-amber-400/50 text-white'
-                  : 'bg-zinc-900/80 border-white/10 text-white'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${item.availability === 'available' ? 'bg-white animate-pulse' : 'bg-white/60'}`} />
-                {item.availability.charAt(0).toUpperCase() + item.availability.slice(1)}
+          <div className="absolute left-3 top-3 flex flex-col items-start gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-bold uppercase tracking-wide text-white shadow-soft ${
+                CONDITION_TONES[item.condition] || 'bg-zinc-600'
+              }`}
+            >
+              {item.condition}
+            </span>
+            {item.featured && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-zinc-900/90 px-2.5 py-1 text-2xs font-bold uppercase tracking-wide text-white backdrop-blur">
+                <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                Featured
               </span>
-              {item.lendingFee > 0 ? (
-                <span className="px-3 py-1.5 rounded-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-white/20 text-xs font-bold shadow-lg">
-                  ${item.lendingFee}/day
-                </span>
-              ) : (
-                <span className="px-3 py-1.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-bold shadow-lg">
-                  FREE
-                </span>
-              )}
-            </div>
+            )}
           </div>
 
-          {/* Content */}
-          <div className="p-5">
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <h3 className="font-display font-semibold text-[17px] leading-tight line-clamp-2 group-hover:text-violet-600 transition-colors">
-                {item.title}
-              </h3>
-              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30 flex-shrink-0">
-                <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                <span className="text-xs font-bold">{item.rating}</span>
-              </div>
-            </div>
+          <button
+            type="button"
+            onClick={toggleWishlist}
+            disabled={saving}
+            aria-label={isWishlisted ? `Remove ${item.title} from wishlist` : `Save ${item.title} to wishlist`}
+            aria-pressed={isWishlisted}
+            className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border shadow-soft backdrop-blur transition-all ${
+              isWishlisted
+                ? 'border-rose-500 bg-rose-500 text-white'
+                : 'border-white/40 bg-white/90 text-zinc-700 hover:scale-105 dark:border-zinc-700/60 dark:bg-zinc-900/85 dark:text-zinc-200'
+            }`}
+          >
+            <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-current' : ''}`} aria-hidden="true" />
+          </button>
 
-            <p className="text-[13px] text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed mb-3">
-              {item.description}
-            </p>
-
-            <div className="flex items-center gap-2 mb-4">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px] font-medium">
-                {item.category}
+          <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-semibold backdrop-blur ${availability.className}`}>
+              <span className="status-dot bg-white/90" aria-hidden="true" />
+              {availability.label}
+            </span>
+            {item.lendingFee > 0 ? (
+              <span className="rounded-full bg-white/95 px-2.5 py-1 text-2xs font-bold text-zinc-900 backdrop-blur">
+                ${item.lendingFee}/day
               </span>
-              <span className="text-[11px] text-zinc-500 flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {item.borrowCount} borrows
+            ) : (
+              <span className="rounded-full bg-brand-600 px-2.5 py-1 text-2xs font-bold text-white">
+                Free
               </span>
-            </div>
+            )}
+          </div>
+        </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <img src={item.owner?.avatar} alt={item.owner?.name} className="w-7 h-7 rounded-full object-cover ring-2 ring-white dark:ring-zinc-900 shadow-sm" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium leading-none">{item.owner?.name?.split(' ')[0]}</span>
-                  <span className="text-[11px] text-zinc-500 flex items-center gap-1 leading-none mt-0.5">
-                    <Shield className="w-3 h-3" /> {item.owner?.rating} • Verified
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-zinc-500">
-                <MapPin className="w-3 h-3" />
-                <span className="truncate max-w-[110px]">{item.location?.split(' - ')[0]}</span>
-              </div>
-            </div>
+        <div className="flex flex-1 flex-col p-5">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="line-clamp-2 font-display text-[16px] font-semibold leading-snug transition-colors group-hover:text-brand-700 dark:group-hover:text-brand-300">
+              {item.title}
+            </h3>
+            <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-amber-200/70 bg-amber-50 px-2 py-0.5 dark:border-amber-400/20 dark:bg-amber-500/10">
+              <Star className="h-3 w-3 fill-amber-500 text-amber-500" aria-hidden="true" />
+              <span className="text-[11px] font-bold">{item.rating ?? '5.0'}</span>
+            </span>
           </div>
 
-          {/* Hover shimmer */}
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none overflow-hidden rounded-[24px]">
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+            {item.description}
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="chip">
+              <Tag className="h-3 w-3" aria-hidden="true" />
+              {item.category}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+              <Repeat2 className="h-3 w-3" aria-hidden="true" />
+              {item.borrowCount || 0} borrows
+            </span>
+          </div>
+
+          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <img
+                src={item.owner?.avatar}
+                alt=""
+                loading="lazy"
+                className="h-7 w-7 flex-shrink-0 rounded-full border border-border object-cover"
+              />
+              <div className="min-w-0">
+                <p className="flex items-center gap-1 truncate text-xs font-semibold leading-none">
+                  {item.owner?.name || 'BorrowBox member'}
+                  {item.owner?.verified && (
+                    <BadgeCheck className="h-3.5 w-3.5 flex-shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+                  )}
+                </p>
+                <p className="mt-1 flex items-center gap-1 text-[11px] leading-none text-zinc-500 dark:text-zinc-400">
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+                  {item.owner?.rating ?? '5.0'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex min-w-0 items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+              <MapPin className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+              <span className="truncate">{item.location?.split(' - ')[0]}</span>
+            </div>
           </div>
         </div>
       </Link>
-    </motion.div>
+    </motion.article>
   );
 }
