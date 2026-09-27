@@ -275,14 +275,21 @@ BorrowBox/
 
 ## Scripts
 
-| Location  | Command         | Description                              |
-| --------- | --------------- | ---------------------------------------- |
-| backend   | `npm run dev`   | Start with file watching                 |
-| backend   | `npm start`     | Start the API server                     |
-| backend   | `npm run seed`  | Reset `data/db.json` and reseed demo data |
-| frontend  | `npm run dev`   | Start the Vite dev server on port 5173    |
-| frontend  | `npm run build` | Production build into `frontend/dist`     |
-| frontend  | `npm run preview` | Serve the production build on port 4173 |
+| Location  | Command           | Description                                          |
+| --------- | ----------------- | ---------------------------------------------------- |
+| backend   | `npm run dev`     | Start with file watching                             |
+| backend   | `npm start`       | Start the API server                                 |
+| backend   | `npm run seed`    | Reset `data/db.json` and reseed demo data            |
+| backend   | `npm test`        | API contract and security tests (in-process server)  |
+| frontend  | `npm run dev`     | Start the Vite dev server on port 5173                |
+| frontend  | `npm run build`   | Production build into `frontend/dist`                |
+| frontend  | `npm run preview` | Serve the production build on port 4173              |
+| frontend  | `npm run check`   | Render every page to a string and report failures    |
+| frontend  | `npm run verify`  | `npm run check` followed by `npm run build`          |
+
+Both test suites are self-contained: the API tests start their own server on an ephemeral port
+with a throwaway database, and the render check bundles the app with esbuild and server-renders
+every route with a minimal DOM shim.
 
 ---
 

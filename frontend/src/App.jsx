@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ErrorBoundary from './components/ErrorBoundary';
 import Home from './pages/Home';
+import { INFO_PAGE_SLUGS } from './lib/infoPages';
 import { Package } from 'lucide-react';
 
 /* Route level code-splitting keeps the first paint light. */
@@ -22,11 +23,6 @@ const ListItem = lazy(() => import('./pages/ListItem'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Messages = lazy(() => import('./pages/Messages'));
 const InfoPage = lazy(() => import('./pages/InfoPage'));
-
-const INFO_PAGE_SLUGS = [
-  'about', 'careers', 'press', 'help', 'safety', 'guidelines', 'status',
-  'terms', 'privacy', 'cookies', 'lending-agreement', 'licenses',
-];
 
 function RouteFallback() {
   return (

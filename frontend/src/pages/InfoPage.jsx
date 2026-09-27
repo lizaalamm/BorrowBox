@@ -1,3 +1,4 @@
+import { INFO_PAGE_SLUGS } from '../lib/infoPages';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, BadgeCheck, BookOpen, Briefcase, Cookie, FileText, LifeBuoy,
@@ -411,4 +412,13 @@ export default function InfoPage() {
   );
 }
 
-export const INFO_PAGE_SLUGS = Object.keys(PAGES);
+export { INFO_PAGE_SLUGS };
+
+// Guard against a route that has no content, or content that has no route.
+if (import.meta.env.DEV) {
+  const withoutContent = INFO_PAGE_SLUGS.filter((slug) => !PAGES[slug]);
+  const withoutRoute = Object.keys(PAGES).filter((slug) => !INFO_PAGE_SLUGS.includes(slug));
+  if (withoutContent.length || withoutRoute.length) {
+    console.warn('[BorrowBox] Informational page mismatch', { withoutContent, withoutRoute });
+  }
+}

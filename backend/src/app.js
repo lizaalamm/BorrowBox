@@ -21,6 +21,7 @@ import messageRoutes from './routes/messages.js';
 const app = express();
 
 const isProduction = process.env.NODE_ENV === 'production';
+const isTest = process.env.NODE_ENV === 'test';
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -83,10 +84,10 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
-if (!isProduction) {
-  app.use(morgan('dev'));
-} else {
+if (isProduction) {
   app.use(morgan('combined', { skip: (req) => req.path === '/api/health' }));
+} else if (!isTest) {
+  app.use(morgan('dev'));
 }
 
 /* --------------------------------------------------------------- rate limits */
