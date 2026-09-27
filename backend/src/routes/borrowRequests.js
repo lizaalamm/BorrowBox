@@ -1,7 +1,8 @@
 import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
-import { borrowRequestSchema } from '../utils/validation.js';
+import { borrowRequestSchema, borrowStatusSchema } from '../utils/validation.js';
+import { publicBorrowRequest } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -12,18 +13,7 @@ const router = express.Router();
  *   description: Borrow request workflow
  */
 
-function enrichRequest(br) {
-  const item = storage.findById('items', br.itemId);
-  const borrower = storage.findById('users', br.borrowerId);
-  const owner = storage.findById('users', br.ownerId);
-  const safeBorrower = borrower ? (({ password, ...s }) => s)(borrower) : null;
-  const safeOwner = owner ? (({ password, ...s }) => s)(owner) : null;
-  const enrichedItem = item ? {
-    ...item,
-    owner: safeOwner
-  } : null;
-  return { ...br, item: enrichedItem, borrower: safeBorrower, owner: safeOwner };
-}
+const enrichRequest = publicBorrowRequest;
 
 /**
  * @swagger
@@ -114,6 +104,21 @@ router.post('/', authenticate, (req, res) => {
   const { error, value } = borrowRequestSchema.validate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
+  const start = new Date(value.startDate);
+  const end = new Date(value.endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return res.status(400).json({ success: false, message: 'Invalid borrow dates' });
+  }
+  if (end < start) {
+    return res.status(400).json({ success: false, message: 'The return date must be on or after the start date' });
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (start < today && req.user.role !== 'admin') {
+    return res.status(400).json({ success: false, message: 'The start date cannot be in the past' });
+  }
+
   const item = storage.findById('items', value.itemId);
   if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
   if (item.ownerId === req.user.id) return res.status(400).json({ success: false, message: 'Cannot borrow your own item' });
@@ -122,9 +127,7 @@ router.post('/', authenticate, (req, res) => {
   const existingPending = storage.findOne('borrowRequests', r => r.itemId === value.itemId && r.borrowerId === req.user.id && r.status === 'pending');
   if (existingPending) return res.status(400).json({ success: false, message: 'You already have a pending request for this item' });
 
-  const start = new Date(value.startDate);
-  const end = new Date(value.endDate);
-  const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 1;
+  const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
   const totalFee = (item.lendingFee || 0) * days;
 
   const br = storage.create('borrowRequests', {
@@ -143,7 +146,7 @@ router.post('/', authenticate, (req, res) => {
   storage.create('notifications', {
     userId: item.ownerId,
     type: 'borrow_request',
-    title: 'New Borrow Request 📥',
+    title: 'New borrow request',
     message: `${req.user.name} wants to borrow your ${item.title}`,
     relatedId: br.id,
     read: false
@@ -178,7 +181,9 @@ router.post('/', authenticate, (req, res) => {
  *       200: { description: Status updated }
  */
 router.put('/:id/status', authenticate, (req, res) => {
-  const { status, ownerMessage } = req.body;
+  const { error, value } = borrowStatusSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+  const { status, ownerMessage } = value;
   const validTransitions = {
     pending: ['approved', 'rejected', 'cancelled'],
     approved: ['borrowed', 'cancelled'],
@@ -239,28 +244,33 @@ router.put('/:id/status', authenticate, (req, res) => {
   if (status === 'approved') {
     notifUserId = br.borrowerId;
     notifType = 'request_approved';
-    notifTitle = 'Request Approved! 🎉';
+    notifTitle = 'Request approved';
     notifMessage = `Your request for ${item?.title} was approved by owner`;
   } else if (status === 'rejected') {
     notifUserId = br.borrowerId;
     notifType = 'request_rejected';
-    notifTitle = 'Request Declined';
+    notifTitle = 'Request declined';
     notifMessage = `Your request for ${item?.title} was declined`;
   } else if (status === 'borrowed') {
     notifUserId = br.borrowerId;
     notifType = 'system';
-    notifTitle = 'Item Borrowed';
-    notifMessage = `You have borrowed ${item?.title}. Enjoy!`;
+    notifTitle = 'Item borrowed';
+    notifMessage = `You have borrowed ${item?.title}. Return it by ${br.endDate}.`;
   } else if (status === 'returned') {
     notifUserId = br.ownerId;
     notifType = 'item_returned';
-    notifTitle = 'Item Returned 📦';
+    notifTitle = 'Item returned';
     notifMessage = `${storage.findById('users', br.borrowerId)?.name} returned ${item?.title}`;
   } else if (status === 'completed') {
     notifUserId = br.borrowerId;
     notifType = 'system';
-    notifTitle = 'Transaction Completed ✅';
-    notifMessage = `Borrowing of ${item?.title} completed. Please leave a review!`;
+    notifTitle = 'Borrow completed';
+    notifMessage = `Borrowing of ${item?.title} is complete. You can now leave a review.`;
+  } else if (status === 'cancelled') {
+    notifUserId = br.ownerId;
+    notifType = 'system';
+    notifTitle = 'Request cancelled';
+    notifMessage = `${storage.findById('users', br.borrowerId)?.name} cancelled their request for ${item?.title}`;
   }
 
   if (notifUserId) {

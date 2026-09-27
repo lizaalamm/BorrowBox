@@ -1,85 +1,239 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Mail, Lock, MapPin, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import {
+  ArrowRight, Check, Eye, EyeOff, Lock, Mail, MapPin, ShieldCheck, Star, Users, X,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import Logo from '../components/Logo';
+
+const PASSWORD_RULES = [
+  { label: 'At least 8 characters', test: (value) => value.length >= 8 },
+  { label: 'One uppercase letter', test: (value) => /[A-Z]/.test(value) },
+  { label: 'One lowercase letter', test: (value) => /[a-z]/.test(value) },
+  { label: 'One number', test: (value) => /\d/.test(value) },
+];
 
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', location: '', bio: '' });
-  const [showPass, setShowPass] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', password: '', location: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const passwordChecks = useMemo(
+    () => PASSWORD_RULES.map((rule) => ({ ...rule, passed: rule.test(form.password) })),
+    [form.password],
+  );
+  const passwordValid = passwordChecks.every((rule) => rule.passed);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!passwordValid) {
+      toast.error('Choose a stronger password that meets every requirement');
+      return;
+    }
+    if (!acceptedTerms) {
+      toast.error('Please accept the terms to create an account');
+      return;
+    }
+
     setLoading(true);
     try {
-      await register(form);
-      toast.success('Account created! Welcome to BorrowBox 🎉');
-      navigate('/dashboard');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed');
-    } finally { setLoading(false); }
+      await register({ ...form, name: form.name.trim(), email: form.email.trim().toLowerCase() });
+      toast.success('Account created. Welcome to BorrowBox.');
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-[90vh] flex">
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[440px]">
-          <Link to="/" className="inline-flex items-center gap-2 mb-8"><div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center text-white font-bold">B</div><span className="font-display font-bold text-lg">BorrowBox</span></Link>
+    <div className="min-h-screen lg:grid lg:grid-cols-2">
+      {/* Form */}
+      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-[460px]"
+        >
+          <Logo size={44} showTagline={false} wordmarkClass="text-[22px]" />
 
-          <h1 className="font-display font-bold text-[32px] leading-none tracking-tight">Create account</h1>
-          <p className="text-zinc-600 dark:text-zinc-400 mt-3">Join 2,400+ neighbors sharing what they own.</p>
+          <h1 className="mt-8 font-display text-[30px] font-bold leading-tight tracking-[-0.02em]">Create your account</h1>
+          <p className="mt-2 text-[15px] text-zinc-600 dark:text-zinc-400">
+            Free forever for personal lending. No card required.
+          </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="text-sm font-medium">Full name</label>
-              <div className="relative mt-1.5"><User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" /><input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="John Doe" className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm" /></div>
+              <label className="label" htmlFor="name">Full name</label>
+              <input
+                id="name"
+                required
+                minLength={2}
+                maxLength={50}
+                autoComplete="name"
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                placeholder="Taylor Reed"
+                className="input"
+              />
             </div>
+
             <div>
-              <label className="text-sm font-medium">Email</label>
-              <div className="relative mt-1.5"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" /><input type="email" required value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="you@example.com" className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium">Password</label>
-                <div className="relative mt-1.5"><Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" /><input type={showPass?'text':'password'} required value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="••••••••" className="w-full pl-10 pr-10 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">{showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
+              <label className="label" htmlFor="email">Email address</label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={form.email}
+                  onChange={(event) => setForm({ ...form, email: event.target.value })}
+                  placeholder="you@example.com"
+                  className="input input-icon"
+                />
               </div>
-              <div>
-                <label className="text-sm font-medium">Location</label>
-                <div className="relative mt-1.5"><MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" /><input value={form.location} onChange={e => setForm({...form, location: e.target.value})} placeholder="SF, CA" className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm" /></div>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Bio (optional)</label>
-              <textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})} placeholder="DIY enthusiast, loves sharing tools..." rows={2} className="mt-1.5 w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm resize-none" />
             </div>
 
-            <button disabled={loading} className="w-full py-3.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-sm hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 disabled:opacity-60">
-              {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><span>Create account</span><ArrowRight className="w-4 h-4" /></>}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="password">Password</label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="new-password"
+                    value={form.password}
+                    onChange={(event) => setForm({ ...form, password: event.target.value })}
+                    placeholder="At least 8 characters"
+                    className="input input-icon pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-zinc-400 transition-colors hover:text-zinc-700"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="location">Neighbourhood</label>
+                <div className="relative">
+                  <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                  <input
+                    id="location"
+                    maxLength={100}
+                    autoComplete="address-level2"
+                    value={form.location}
+                    onChange={(event) => setForm({ ...form, location: event.target.value })}
+                    placeholder="Mission District, SF"
+                    className="input input-icon"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {passwordChecks.map((rule) => (
+                <li
+                  key={rule.label}
+                  className={`flex items-center gap-2 text-[12.5px] ${rule.passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'}`}
+                >
+                  {rule.passed ? (
+                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {rule.label}
+                </li>
+              ))}
+            </ul>
+
+            <label className="flex items-start gap-2.5 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(event) => setAcceptedTerms(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded accent-brand-600"
+              />
+              <span>
+                I agree to the{' '}
+                <Link to="/terms" className="font-semibold text-brand-700 hover:underline dark:text-brand-300">terms of service</Link>{' '}
+                and{' '}
+                <Link to="/privacy" className="font-semibold text-brand-700 hover:underline dark:text-brand-300">privacy policy</Link>.
+              </span>
+            </label>
+
+            <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
+              {loading ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />
+                  Creating account
+                </>
+              ) : (
+                <>
+                  Create account
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </>
+              )}
             </button>
           </form>
 
-          <p className="text-center text-sm text-zinc-600 dark:text-zinc-400 mt-6">Already have an account? <Link to="/login" className="font-semibold text-zinc-900 dark:text-white hover:underline">Sign in</Link></p>
-          <p className="text-center text-[11px] text-zinc-500 mt-4">By creating an account, you agree to our Terms & Privacy Policy. Verified users get a badge.</p>
+          <p className="mt-6 text-center text-[14px] text-zinc-600 dark:text-zinc-400">
+            Already have an account?{' '}
+            <Link to="/login" className="font-semibold text-brand-700 hover:underline dark:text-brand-300">Sign in</Link>
+          </p>
         </motion.div>
       </div>
 
-      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-zinc-900">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-cyan-500 opacity-90" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:32px_32px]" />
-        <div className="relative p-12 text-white w-full flex flex-col justify-between">
-          <div><span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20 text-xs font-medium">✨ Free forever for personal use</span></div>
+      {/* Marketing panel */}
+      <div className="relative hidden overflow-hidden border-l border-border bg-zinc-900 lg:flex">
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-700 via-violet-700 to-cyan-600 opacity-95" aria-hidden="true" />
+        <div className="absolute inset-0 grid-backdrop opacity-20" aria-hidden="true" />
+        <div className="relative flex w-full flex-col justify-between p-12 text-white">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-2xs font-bold uppercase tracking-[0.14em] backdrop-blur">
+            <Star className="h-3.5 w-3.5" aria-hidden="true" />
+            Free forever for personal lending
+          </span>
+
           <div>
-            <h2 className="font-display font-bold text-[40px] leading-[0.9] tracking-tight">Turn your<br/>garage into<br/>a community<br/>library.</h2>
-            <div className="mt-8 space-y-3">
-              <div className="flex items-center gap-3 text-sm"><div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">✓</div><span>List items in 30 seconds</span></div>
-              <div className="flex items-center gap-3 text-sm"><div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">✓</div><span>Verified neighbors only</span></div>
-              <div className="flex items-center gap-3 text-sm"><div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">✓</div><span>Earn reputation & optional fees</span></div>
-            </div>
+            <h2 className="max-w-[420px] font-display text-[40px] font-bold leading-[0.98] tracking-[-0.03em]">
+              Turn your garage into a community library.
+            </h2>
+
+            <ul className="mt-8 space-y-4">
+              {[
+                { Icon: Check, text: 'List an item in under 30 seconds' },
+                { Icon: ShieldCheck, text: 'Verified neighbours and $500 protection' },
+                { Icon: Users, text: 'Build reputation and lend with confidence' },
+                { Icon: MapPin, text: 'Everything happens within a few streets' },
+              ].map(({ Icon, text }) => (
+                <li key={text} className="flex items-center gap-3 text-[14px]">
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  {text}
+                </li>
+              ))}
+            </ul>
           </div>
+
+          <p className="max-w-[380px] text-[13px] leading-relaxed text-white/70">
+            BorrowBox members avoid an average of $190 in purchases every year while keeping 3.4 times more use
+            out of the things they already own.
+          </p>
         </div>
       </div>
     </div>

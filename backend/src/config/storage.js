@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DB_PATH = path.join(__dirname, '../../data/db.json');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/db.json');
 
 const defaultData = {
   users: [],
@@ -19,13 +19,27 @@ const defaultData = {
   messages: []
 };
 
+/**
+ * Demo accounts shared by the seed data, the auth demo endpoint and the docs.
+ * Passwords are only used when the database is first created.
+ */
+export const DEMO_ACCOUNTS = [
+  { role: 'admin', name: 'User 1', email: 'user1@borrowbox.com', password: 'Admin@123', description: 'Admin account with moderation access' },
+  { role: 'user', name: 'User 2', email: 'user2@borrowbox.com', password: 'Demo@123', description: 'Primary member account with items' },
+  { role: 'user', name: 'User 3', email: 'user3@borrowbox.com', password: 'User@123', description: 'Photographer and book lover' },
+  { role: 'user', name: 'User 4', email: 'user4@borrowbox.com', password: 'User@123', description: 'Outdoor gear collector' }
+];
+
 class Storage {
   constructor() {
     this.data = { ...defaultData };
     this.load();
-    if (this.data.users.length === 0) {
-      this.seed();
-    }
+
+    /**
+     * Seeding hashes passwords, so it is asynchronous. `ready` lets the server
+     * bootstrap wait for the seed to finish before it accepts traffic.
+     */
+    this.ready = this.data.users.length === 0 ? this.seed() : Promise.resolve();
   }
 
   load() {
@@ -34,8 +48,8 @@ class Storage {
         const raw = fs.readFileSync(DB_PATH, 'utf-8');
         this.data = { ...defaultData, ...JSON.parse(raw) };
       }
-    } catch (e) {
-      console.log('No existing DB, using default');
+    } catch (error) {
+      console.error('[storage] Could not read the database file, starting fresh:', error.message);
       this.data = { ...defaultData };
     }
   }
@@ -45,114 +59,125 @@ class Storage {
       const dir = path.dirname(DB_PATH);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(DB_PATH, JSON.stringify(this.data, null, 2));
-    } catch (e) {
-      console.error('Failed to save DB', e);
+    } catch (error) {
+      console.error('[storage] Failed to persist the database:', error.message);
     }
   }
 
   async seed() {
-    console.log('🌱 Seeding database...');
-    const hashedAdmin = await bcrypt.hash('Admin@123', 10);
-    const hashedDemo = await bcrypt.hash('Demo@123', 10);
-    const hashedUser = await bcrypt.hash('User@123', 10);
+    console.log('[storage] Seeding the database with demo data...');
 
-    const adminId = uuidv4();
-    const demoId = uuidv4();
-    const aliceId = uuidv4();
-    const bobId = uuidv4();
+    const passwordHashes = {};
+    for (const account of DEMO_ACCOUNTS) {
+      passwordHashes[account.email] = await bcrypt.hash(account.password, 10);
+    }
+
+    const ids = Object.fromEntries(DEMO_ACCOUNTS.map((account) => [account.email, uuidv4()]));
+    const now = Date.now();
+    const daysAgo = (days) => new Date(now - 1000 * 60 * 60 * 24 * days).toISOString();
+
+    const avatar = (seed) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
 
     this.data.users = [
       {
-        id: adminId,
-        name: 'Alex Morgan',
-        email: 'admin@borrowbox.com',
-        password: hashedAdmin,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
+        id: ids['user1@borrowbox.com'],
+        name: 'User 1',
+        email: 'user1@borrowbox.com',
+        password: passwordHashes['user1@borrowbox.com'],
+        avatar: avatar('user1'),
         role: 'admin',
-        bio: 'BorrowBox Admin & Community Manager. Passionate about sustainable sharing economy.',
+        bio: 'BorrowBox community manager. Focused on trust, safety and keeping neighbourhood lending human.',
         location: 'San Francisco, CA',
-        rating: 5.0,
-        totalLends: 156,
-        totalBorrows: 89,
+        rating: 5,
+        totalLends: 42,
+        totalBorrows: 18,
         verified: true,
-        joinedAt: new Date(Date.now() - 1000*60*60*24*400).toISOString(),
-        createdAt: new Date().toISOString()
+        joinedAt: daysAgo(400),
+        createdAt: daysAgo(400)
       },
       {
-        id: demoId,
-        name: 'Jordan Lee',
-        email: 'demo@borrowbox.com',
-        password: hashedDemo,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jordan',
+        id: ids['user2@borrowbox.com'],
+        name: 'User 2',
+        email: 'user2@borrowbox.com',
+        password: passwordHashes['user2@borrowbox.com'],
+        avatar: avatar('user2'),
         role: 'user',
-        bio: 'DIY enthusiast. I love lending my tools to neighbors! 🔧',
+        bio: 'DIY enthusiast and weekend woodworker. Happy to lend tools and walk anyone through their first project.',
         location: 'Mission District, SF',
         rating: 4.9,
-        totalLends: 42,
-        totalBorrows: 28,
+        totalLends: 24,
+        totalBorrows: 16,
         verified: true,
-        joinedAt: new Date(Date.now() - 1000*60*60*24*200).toISOString(),
-        createdAt: new Date().toISOString()
+        joinedAt: daysAgo(220),
+        createdAt: daysAgo(220)
       },
       {
-        id: aliceId,
-        name: 'Alice Chen',
-        email: 'alice@example.com',
-        password: hashedUser,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alice',
+        id: ids['user3@borrowbox.com'],
+        name: 'User 3',
+        email: 'user3@borrowbox.com',
+        password: passwordHashes['user3@borrowbox.com'],
+        avatar: avatar('user3'),
         role: 'user',
-        bio: 'Book lover & photographer. Always happy to share!',
-        location: 'Noe Valley, SF - 0.3 miles',
+        bio: 'Photographer and reader. I keep a small kit of camera gear and first edition books in circulation.',
+        location: 'Noe Valley, SF',
         rating: 4.8,
         totalLends: 31,
-        totalBorrows: 52,
+        totalBorrows: 22,
         verified: true,
-        joinedAt: new Date(Date.now() - 1000*60*60*24*150).toISOString(),
-        createdAt: new Date().toISOString()
+        joinedAt: daysAgo(180),
+        createdAt: daysAgo(180)
       },
       {
-        id: bobId,
-        name: 'Bob Williams',
-        email: 'bob@example.com',
-        password: hashedUser,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bob',
+        id: ids['user4@borrowbox.com'],
+        name: 'User 4',
+        email: 'user4@borrowbox.com',
+        password: passwordHashes['user4@borrowbox.com'],
+        avatar: avatar('user4'),
         role: 'user',
-        bio: 'Outdoor gear collector. Let’s make adventure accessible!',
-        location: 'Sunset, SF - 1.2 miles',
+        bio: 'Outdoor gear collector. Camping, climbing and cycling equipment available most weekends.',
+        location: 'Sunset, SF',
         rating: 4.7,
         totalLends: 27,
-        totalBorrows: 19,
+        totalBorrows: 14,
         verified: true,
-        joinedAt: new Date(Date.now() - 1000*60*60*24*90).toISOString(),
-        createdAt: new Date().toISOString()
+        joinedAt: daysAgo(120),
+        createdAt: daysAgo(120)
       }
     ];
 
     this.data.categories = [
-      { id: uuidv4(), name: 'Tools', slug: 'tools', icon: '🔧', color: '#8B5CF6', description: 'Power tools, hand tools, gardening', itemCount: 0 },
-      { id: uuidv4(), name: 'Electronics', slug: 'electronics', icon: '💻', color: '#06B6D4', description: 'Cameras, drones, gadgets', itemCount: 0 },
-      { id: uuidv4(), name: 'Books', slug: 'books', icon: '📚', color: '#F59E0B', description: 'Fiction, non-fiction, textbooks', itemCount: 0 },
-      { id: uuidv4(), name: 'Outdoor', slug: 'outdoor', icon: '🏕️', color: '#10B981', description: 'Camping, hiking, sports', itemCount: 0 },
-      { id: uuidv4(), name: 'Home', slug: 'home', icon: '🏠', color: '#EF4444', description: 'Kitchen, furniture, decor', itemCount: 0 },
-      { id: uuidv4(), name: 'Party', slug: 'party', icon: '🎉', color: '#EC4899', description: 'Decorations, speakers, games', itemCount: 0 },
-      { id: uuidv4(), name: 'Clothing', slug: 'clothing', icon: '👗', color: '#6366F1', description: 'Costumes, formal wear', itemCount: 0 },
-      { id: uuidv4(), name: 'Sports', slug: 'sports', icon: '⚽', color: '#84CC16', description: 'Equipment, gear', itemCount: 0 }
+      { id: uuidv4(), name: 'Tools', slug: 'tools', icon: 'wrench', color: '#4F46E5', description: 'Power tools, hand tools and gardening equipment', itemCount: 0 },
+      { id: uuidv4(), name: 'Electronics', slug: 'electronics', icon: 'laptop', color: '#06B6D4', description: 'Cameras, drones and everyday gadgets', itemCount: 0 },
+      { id: uuidv4(), name: 'Books', slug: 'books', icon: 'book-open', color: '#F59E0B', description: 'Fiction, non-fiction and textbooks', itemCount: 0 },
+      { id: uuidv4(), name: 'Outdoor', slug: 'outdoor', icon: 'tent', color: '#10B981', description: 'Camping, hiking and climbing gear', itemCount: 0 },
+      { id: uuidv4(), name: 'Home', slug: 'home', icon: 'utensils', color: '#EF4444', description: 'Kitchen appliances, furniture and decor', itemCount: 0 },
+      { id: uuidv4(), name: 'Party', slug: 'party', icon: 'party-popper', color: '#EC4899', description: 'Speakers, decorations and games', itemCount: 0 },
+      { id: uuidv4(), name: 'Clothing', slug: 'clothing', icon: 'shirt', color: '#6366F1', description: 'Formal wear and costumes for events', itemCount: 0 },
+      { id: uuidv4(), name: 'Sports', slug: 'sports', icon: 'dumbbell', color: '#84CC16', description: 'Bikes, boards and training equipment', itemCount: 0 }
     ];
 
-    const getCat = (slug) => this.data.categories.find(c => c.slug === slug);
+    const categoryBySlug = (slug) => this.data.categories.find((category) => category.slug === slug);
+
+    // Short handles for the four seeded personas.
+    const owner = {
+      user1: ids['user1@borrowbox.com'],
+      user2: ids['user2@borrowbox.com'],
+      user3: ids['user3@borrowbox.com'],
+      user4: ids['user4@borrowbox.com']
+    };
 
     this.data.items = [
       {
         id: uuidv4(),
         title: 'DeWalt 20V Cordless Drill Kit',
-        description: 'Professional-grade cordless drill with 2 batteries, charger, and carrying case. Perfect for any DIY project. Barely used, like new condition. Includes drill bits set.',
+        description: 'Professional grade cordless drill with two batteries, fast charger, 30 piece bit set and a hard carry case. Excellent condition, used on three small projects.',
         category: 'Tools',
-        categoryId: getCat('tools').id,
+        categoryId: categoryBySlug('tools').id,
         images: [
-          'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=800',
-          'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800'
+          'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=900&q=80',
+          'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=900&q=80'
         ],
-        ownerId: demoId,
+        ownerId: owner.user2,
         condition: 'Like New',
         value: 199,
         lendingFee: 0,
@@ -160,45 +185,45 @@ class Storage {
         location: 'Mission District, SF - 0.2 miles',
         tags: ['power-tools', 'diy', 'dewalt'],
         rating: 4.9,
-        reviewCount: 12,
+        reviewCount: 2,
         borrowCount: 8,
         featured: true,
-        createdAt: new Date(Date.now() - 1000*60*60*24*5).toISOString()
+        createdAt: daysAgo(5)
       },
       {
         id: uuidv4(),
-        title: 'Sony A7III Mirrorless Camera',
-        description: 'Full-frame mirrorless camera with 28-70mm lens. Ideal for events, portraits, travel. Comes with extra battery, 64GB SD card, and camera bag. Professional quality.',
+        title: 'Sony A7 III Mirrorless Camera',
+        description: 'Full frame mirrorless camera with a 28-70mm lens, spare battery, 64GB card and padded bag. Ideal for events, portraits and travel.',
         category: 'Electronics',
-        categoryId: getCat('electronics').id,
+        categoryId: categoryBySlug('electronics').id,
         images: [
-          'https://images.unsplash.com/photo-1510127034890-ba27508e9f1c?w=800',
-          'https://images.unsplash.com/photo-1452780212940-6f5c84d7fa94?w=800'
+          'https://images.unsplash.com/photo-1510127034890-ba27508e9f1c?w=900&q=80',
+          'https://images.unsplash.com/photo-1452780212940-6f5c84d7fa94?w=900&q=80'
         ],
-        ownerId: aliceId,
+        ownerId: owner.user3,
         condition: 'Good',
         value: 1800,
         lendingFee: 25,
         availability: 'available',
         location: 'Noe Valley, SF - 0.3 miles',
         tags: ['camera', 'photography', 'sony'],
-        rating: 5.0,
-        reviewCount: 18,
+        rating: 5,
+        reviewCount: 1,
         borrowCount: 15,
         featured: true,
-        createdAt: new Date(Date.now() - 1000*60*60*24*2).toISOString()
+        createdAt: daysAgo(2)
       },
       {
         id: uuidv4(),
-        title: 'Complete Camping Set - 4 Person',
-        description: 'Everything you need for camping: 4-person tent, sleeping bags x4, camping stove, lantern, chairs. Used once, excellent condition. Great for weekend getaway!',
+        title: 'Complete 4 Person Camping Set',
+        description: 'Four person tent, four sleeping bags, camping stove, lantern and two folding chairs. Used twice, stored dry and clean. Great for a weekend trip.',
         category: 'Outdoor',
-        categoryId: getCat('outdoor').id,
+        categoryId: categoryBySlug('outdoor').id,
         images: [
-          'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800',
-          'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=800'
+          'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=900&q=80',
+          'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=900&q=80'
         ],
-        ownerId: bobId,
+        ownerId: owner.user4,
         condition: 'Good',
         value: 450,
         lendingFee: 15,
@@ -206,264 +231,265 @@ class Storage {
         location: 'Sunset, SF - 1.2 miles',
         tags: ['camping', 'tent', 'outdoor'],
         rating: 4.8,
-        reviewCount: 9,
+        reviewCount: 0,
         borrowCount: 6,
         featured: true,
-        createdAt: new Date(Date.now() - 1000*60*60*24*1).toISOString()
+        createdAt: daysAgo(1)
       },
       {
         id: uuidv4(),
-        title: 'Rare First Edition Books Collection',
-        description: 'Collection of 15 rare first edition classics including Hemingway, Fitzgerald. Handle with care. For reading, not resale. Climate-controlled storage.',
+        title: 'First Edition Classics Collection',
+        description: 'Set of fifteen first edition classics including Hemingway and Fitzgerald. For reading only, kept in a climate controlled cabinet.',
         category: 'Books',
-        categoryId: getCat('books').id,
-        images: [
-          'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800'
-        ],
-        ownerId: aliceId,
+        categoryId: categoryBySlug('books').id,
+        images: ['https://images.unsplash.com/photo-1512820790803-83ca734da794?w=900&q=80'],
+        ownerId: owner.user3,
         condition: 'Good',
         value: 800,
         lendingFee: 0,
         availability: 'available',
         location: 'Noe Valley, SF - 0.3 miles',
         tags: ['rare', 'classic', 'literature'],
-        rating: 5.0,
-        reviewCount: 22,
+        rating: 5,
+        reviewCount: 0,
         borrowCount: 11,
         featured: false,
-        createdAt: new Date(Date.now() - 1000*60*60*24*7).toISOString()
+        createdAt: daysAgo(7)
       },
       {
         id: uuidv4(),
-        title: 'KitchenAid Stand Mixer - Empire Red',
-        description: '5-quart stand mixer, barely used. Includes whisk, dough hook, flat beater. Perfect for baking season! Easy to clean.',
+        title: 'KitchenAid Stand Mixer',
+        description: 'Five quart tilt head stand mixer in empire red. Includes whisk, dough hook and flat beater. Deep cleaned after every use.',
         category: 'Home',
-        categoryId: getCat('home').id,
-        images: [
-          'https://images.unsplash.com/photo-1585237672814-8f85a8118bf6?w=800'
-        ],
-        ownerId: demoId,
+        categoryId: categoryBySlug('home').id,
+        images: ['https://images.unsplash.com/photo-1585237672814-8f85a8118bf6?w=900&q=80'],
+        ownerId: owner.user2,
         condition: 'Like New',
-        value: 499,
+        value: 379,
         lendingFee: 0,
         availability: 'borrowed',
         location: 'Mission District, SF - 0.2 miles',
         tags: ['kitchen', 'baking', 'mixer'],
         rating: 4.9,
-        reviewCount: 14,
+        reviewCount: 0,
         borrowCount: 9,
-        featured: false,
-        createdAt: new Date(Date.now() - 1000*60*60*24*3).toISOString()
+        featured: true,
+        createdAt: daysAgo(9)
       },
       {
         id: uuidv4(),
-        title: 'DJ Controller - Pioneer DDJ-400',
-        description: 'Beginner-friendly DJ controller. Perfect for parties! Includes laptop stand and headphones. I can give quick tutorial.',
+        title: 'JBL Party Speaker with Lights',
+        description: 'Portable party speaker with rechargeable battery, wireless microphone input and light show. Perfect for birthdays and small events.',
         category: 'Party',
-        categoryId: getCat('party').id,
-        images: [
-          'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800'
-        ],
-        ownerId: bobId,
+        categoryId: categoryBySlug('party').id,
+        images: ['https://images.unsplash.com/photo-1545454675-3531b543be5d?w=900&q=80'],
+        ownerId: owner.user1,
         condition: 'Good',
-        value: 300,
+        value: 320,
+        lendingFee: 10,
+        availability: 'available',
+        location: 'San Francisco, CA - 0.8 miles',
+        tags: ['speaker', 'party', 'music'],
+        rating: 4.7,
+        reviewCount: 0,
+        borrowCount: 7,
+        featured: false,
+        createdAt: daysAgo(12)
+      },
+      {
+        id: uuidv4(),
+        title: 'Trek Mountain Bike - Size M',
+        description: 'Hardtail mountain bike with 29 inch wheels, hydraulic disc brakes and a recent service. Includes helmet and lock.',
+        category: 'Sports',
+        categoryId: categoryBySlug('sports').id,
+        images: ['https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=900&q=80'],
+        ownerId: owner.user4,
+        condition: 'Good',
+        value: 950,
         lendingFee: 20,
         availability: 'available',
         location: 'Sunset, SF - 1.2 miles',
-        tags: ['dj', 'music', 'party'],
-        rating: 4.7,
-        reviewCount: 7,
-        borrowCount: 12,
-        featured: true,
-        createdAt: new Date(Date.now() - 1000*60*60*24*4).toISOString()
-      },
-      {
-        id: uuidv4(),
-        title: 'Mountain Bike - Trek Fuel EX 9.9',
-        description: 'High-end full suspension mountain bike, size M. Carbon frame. Recently serviced. Helmet and lock included. For experienced riders.',
-        category: 'Sports',
-        categoryId: getCat('sports').id,
-        images: [
-          'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=800',
-          'https://images.unsplash.com/photo-1484156818044-c0402b43b4ad?w=800'
-        ],
-        ownerId: demoId,
-        condition: 'Good',
-        value: 3200,
-        lendingFee: 30,
-        availability: 'available',
-        location: 'Mission District, SF - 0.2 miles',
         tags: ['bike', 'mountain', 'sports'],
         rating: 4.9,
-        reviewCount: 16,
+        reviewCount: 0,
         borrowCount: 10,
         featured: true,
-        createdAt: new Date(Date.now() - 1000*60*60*24*6).toISOString()
+        createdAt: daysAgo(6)
       },
       {
         id: uuidv4(),
-        title: 'Designer Costume Collection - Gala Ready',
-        description: 'Stunning collection of designer dresses and suits for galas, weddings. Sizes 4-8. Dry cleaned after each use. Accessories included.',
+        title: 'Designer Gala Outfit Set',
+        description: 'Two formal outfits suitable for galas and weddings, sizes 4 to 8, dry cleaned after each use. Accessories included.',
         category: 'Clothing',
-        categoryId: getCat('clothing').id,
-        images: [
-          'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800'
-        ],
-        ownerId: aliceId,
+        categoryId: categoryBySlug('clothing').id,
+        images: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=900&q=80'],
+        ownerId: owner.user3,
         condition: 'Like New',
         value: 1200,
         lendingFee: 35,
         availability: 'available',
         location: 'Noe Valley, SF - 0.3 miles',
         tags: ['designer', 'formal', 'gala'],
-        rating: 5.0,
-        reviewCount: 19,
-        borrowCount: 21,
+        rating: 5,
+        reviewCount: 0,
+        borrowCount: 5,
         featured: false,
-        createdAt: new Date(Date.now() - 1000*60*60*24*8).toISOString()
+        createdAt: daysAgo(8)
       }
     ];
 
-    // Update category counts
-    this.data.categories.forEach(cat => {
-      cat.itemCount = this.data.items.filter(i => i.categoryId === cat.id).length;
+    this.data.categories.forEach((category) => {
+      category.itemCount = this.data.items.filter((item) => item.categoryId === category.id).length;
     });
+
+    const drill = this.data.items[0];
+    const mixer = this.data.items[4];
 
     this.data.borrowRequests = [
       {
         id: uuidv4(),
-        itemId: this.data.items[0].id,
-        borrowerId: aliceId,
-        ownerId: demoId,
+        itemId: drill.id,
+        borrowerId: owner.user3,
+        ownerId: owner.user2,
         status: 'pending',
-        startDate: new Date(Date.now() + 1000*60*60*24*1).toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 1000*60*60*24*4).toISOString().split('T')[0],
-        message: 'Hi! Need the drill for a bookshelf project this weekend. Can pickup Friday evening?',
+        startDate: new Date(now + 1000 * 60 * 60 * 24).toISOString().split('T')[0],
+        endDate: new Date(now + 1000 * 60 * 60 * 24 * 4).toISOString().split('T')[0],
+        message: 'Building a bookshelf this weekend and need to drill pilot holes. Could I collect on Friday evening?',
         totalFee: 0,
-        createdAt: new Date(Date.now() - 1000*60*60*5).toISOString()
+        createdAt: new Date(now - 1000 * 60 * 60 * 5).toISOString()
       },
       {
         id: uuidv4(),
-        itemId: this.data.items[4].id,
-        borrowerId: aliceId,
-        ownerId: demoId,
+        itemId: mixer.id,
+        borrowerId: owner.user3,
+        ownerId: owner.user2,
         status: 'borrowed',
-        startDate: new Date(Date.now() - 1000*60*60*24*2).toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 1000*60*60*24*2).toISOString().split('T')[0],
-        message: 'Baking a birthday cake!',
-        ownerMessage: 'Enjoy! Clean after use please.',
+        startDate: new Date(now - 1000 * 60 * 60 * 24 * 2).toISOString().split('T')[0],
+        endDate: new Date(now + 1000 * 60 * 60 * 24 * 2).toISOString().split('T')[0],
+        message: 'Baking a birthday cake for my nephew this week.',
+        ownerMessage: 'Enjoy it. A quick wipe down before returning is all I ask.',
         totalFee: 0,
-        createdAt: new Date(Date.now() - 1000*60*60*24*3).toISOString()
+        createdAt: new Date(now - 1000 * 60 * 60 * 24 * 3).toISOString()
       }
     ];
 
     this.data.reviews = [
       {
         id: uuidv4(),
-        itemId: this.data.items[0].id,
-        reviewerId: aliceId,
-        revieweeId: demoId,
+        itemId: drill.id,
+        reviewerId: owner.user3,
+        revieweeId: owner.user2,
         rating: 5,
-        comment: 'Amazing drill, Jordan was super helpful and friendly! Returned in perfect condition.',
+        comment: 'Drill was in perfect condition and the handover was easy. Clear instructions on the bits too.',
         type: 'item',
-        createdAt: new Date(Date.now() - 1000*60*60*24*10).toISOString()
+        createdAt: daysAgo(10)
       },
       {
         id: uuidv4(),
         itemId: this.data.items[1].id,
-        reviewerId: bobId,
-        revieweeId: aliceId,
+        reviewerId: owner.user4,
+        revieweeId: owner.user3,
         rating: 5,
-        comment: 'Camera was pristine, Alice gave great tips. Captured my sister wedding beautifully!',
+        comment: 'Camera arrived spotless with everything charged. Great tips on settings for low light.',
         type: 'item',
-        createdAt: new Date(Date.now() - 1000*60*60*24*15).toISOString()
+        createdAt: daysAgo(15)
       }
     ];
 
     this.data.notifications = [
       {
         id: uuidv4(),
-        userId: demoId,
+        userId: owner.user2,
         type: 'borrow_request',
-        title: 'New Borrow Request',
-        message: 'Alice Chen wants to borrow your DeWalt Drill Kit',
+        title: 'New borrow request',
+        message: 'User 3 wants to borrow your DeWalt 20V Cordless Drill Kit.',
         relatedId: this.data.borrowRequests[0].id,
         read: false,
-        createdAt: new Date(Date.now() - 1000*60*60*2).toISOString()
+        createdAt: new Date(now - 1000 * 60 * 60 * 2).toISOString()
       },
       {
         id: uuidv4(),
-        userId: aliceId,
+        userId: owner.user3,
         type: 'request_approved',
-        title: 'Request Approved! 🎉',
-        message: 'Your request for KitchenAid Mixer was approved',
+        title: 'Request approved',
+        message: 'Your request for the KitchenAid Stand Mixer was approved.',
         relatedId: this.data.borrowRequests[1].id,
         read: true,
-        createdAt: new Date(Date.now() - 1000*60*60*24*3).toISOString()
+        createdAt: new Date(now - 1000 * 60 * 60 * 24 * 3).toISOString()
       }
     ];
 
     this.data.wishlists = [
-      { id: uuidv4(), userId: aliceId, itemId: this.data.items[0].id, createdAt: new Date().toISOString() },
-      { id: uuidv4(), userId: demoId, itemId: this.data.items[1].id, createdAt: new Date().toISOString() }
+      { id: uuidv4(), userId: owner.user3, itemId: drill.id, createdAt: new Date().toISOString() },
+      { id: uuidv4(), userId: owner.user2, itemId: this.data.items[1].id, createdAt: new Date().toISOString() }
     ];
 
     this.data.messages = [
       {
         id: uuidv4(),
-        conversationId: `${demoId}_${aliceId}`,
-        senderId: aliceId,
-        receiverId: demoId,
-        itemId: this.data.items[0].id,
-        text: 'Hi! Is the drill still available for weekend?',
-        createdAt: new Date(Date.now() - 1000*60*30).toISOString()
+        conversationId: [owner.user2, owner.user3].sort().join('_'),
+        senderId: owner.user3,
+        receiverId: owner.user2,
+        itemId: drill.id,
+        text: 'Hi, is the drill still free this weekend?',
+        createdAt: new Date(now - 1000 * 60 * 30).toISOString()
       },
       {
         id: uuidv4(),
-        conversationId: `${demoId}_${aliceId}`,
-        senderId: demoId,
-        receiverId: aliceId,
-        itemId: this.data.items[0].id,
-        text: 'Yes! Available. You can pick up Friday after 6pm from my place.',
-        createdAt: new Date(Date.now() - 1000*60*20).toISOString()
+        conversationId: [owner.user2, owner.user3].sort().join('_'),
+        senderId: owner.user2,
+        receiverId: owner.user3,
+        itemId: drill.id,
+        text: 'Yes, it is available. Friday after 6pm works well for pickup.',
+        createdAt: new Date(now - 1000 * 60 * 20).toISOString()
       }
     ];
 
     this.save();
-    console.log('✅ Database seeded with demo data');
+    console.log(`[storage] Seed complete: ${this.data.users.length} users, ${this.data.items.length} items, ${this.data.categories.length} categories.`);
   }
 
-  // Generic CRUD
+  /* ------------------------------------------------------------- generic CRUD */
   find(collection, predicate) {
     return this.data[collection].filter(predicate);
   }
+
   findOne(collection, predicate) {
     return this.data[collection].find(predicate);
   }
+
   findById(collection, id) {
-    return this.data[collection].find(item => item.id === id);
+    return this.data[collection].find((entry) => entry.id === id);
   }
+
   create(collection, doc) {
     const newDoc = { id: uuidv4(), ...doc, createdAt: new Date().toISOString() };
     this.data[collection].push(newDoc);
     this.save();
     return newDoc;
   }
+
   update(collection, id, updates) {
-    const idx = this.data[collection].findIndex(item => item.id === id);
-    if (idx === -1) return null;
-    this.data[collection][idx] = { ...this.data[collection][idx], ...updates, updatedAt: new Date().toISOString() };
+    const index = this.data[collection].findIndex((entry) => entry.id === id);
+    if (index === -1) return null;
+    this.data[collection][index] = {
+      ...this.data[collection][index],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
     this.save();
-    return this.data[collection][idx];
+    return this.data[collection][index];
   }
+
   delete(collection, id) {
-    const idx = this.data[collection].findIndex(item => item.id === id);
-    if (idx === -1) return false;
-    this.data[collection].splice(idx, 1);
+    const index = this.data[collection].findIndex((entry) => entry.id === id);
+    if (index === -1) return false;
+    this.data[collection].splice(index, 1);
     this.save();
     return true;
   }
 }
 
 const storage = new Storage();
+export { DB_PATH };
 export default storage;

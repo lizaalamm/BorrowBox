@@ -76,7 +76,7 @@ router.get('/:id', (req, res) => {
  *             required: [name, icon]
  *             properties:
  *               name: { type: string, example: "Garden" }
- *               icon: { type: string, example: "🌱" }
+ *               icon: { type: string, example: "leaf" }
  *               color: { type: string, example: "#10B981" }
  *               description: { type: string }
  *     responses:

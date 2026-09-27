@@ -1,64 +1,127 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { Suspense, lazy } from 'react';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import ErrorBoundary from './components/ErrorBoundary';
 import Home from './pages/Home';
-import Browse from './pages/Browse';
-import ItemDetail from './pages/ItemDetail';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import MyItems from './pages/MyItems';
-import Requests from './pages/Requests';
-import Wishlist from './pages/Wishlist';
-import ListItem from './pages/ListItem';
-import Profile from './pages/Profile';
+import { INFO_PAGE_SLUGS } from './lib/infoPages';
+import { Package } from 'lucide-react';
 
-function Protected({ children }) {
+/* Route level code-splitting keeps the first paint light. */
+const Browse = lazy(() => import('./pages/Browse'));
+const ItemDetail = lazy(() => import('./pages/ItemDetail'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MyItems = lazy(() => import('./pages/MyItems'));
+const Requests = lazy(() => import('./pages/Requests'));
+const Wishlist = lazy(() => import('./pages/Wishlist'));
+const ListItem = lazy(() => import('./pages/ListItem'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Messages = lazy(() => import('./pages/Messages'));
+const InfoPage = lazy(() => import('./pages/InfoPage'));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <span className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" aria-label="Loading page" />
+    </div>
+  );
+}
+
+function RequireAuth({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>;
-  if (!user) return <Navigate to="/login" replace />;
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" aria-label="Checking your session" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
   return children;
 }
 
-function AppRoutes() {
+function NotFound() {
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/browse" element={<Browse />} />
-        <Route path="/items/:id" element={<ItemDetail />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-        <Route path="/my-items" element={<Protected><MyItems /></Protected>} />
-        <Route path="/requests" element={<Protected><Requests /></Protected>} />
-        <Route path="/wishlist" element={<Protected><Wishlist /></Protected>} />
-        <Route path="/list-item" element={<Protected><ListItem /></Protected>} />
-        <Route path="/profile" element={<Protected><Profile /></Protected>} />
-        <Route path="/users/:id" element={<Profile />} />
-        <Route path="*" element={<div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center"><h1 className="font-display font-bold text-4xl">404</h1><p className="text-zinc-500 mt-2">Page not found</p><a href="/" className="mt-6 px-6 py-3 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-semibold">Go home</a></div>} />
-      </Routes>
+    <div className="shell flex min-h-[60vh] flex-col items-center justify-center py-20 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card text-brand-600 dark:text-brand-300">
+        <Package className="h-6 w-6" aria-hidden="true" />
+      </span>
+      <p className="eyebrow mt-6">Error 404</p>
+      <h1 className="mt-3 font-display text-[34px] font-bold tracking-[-0.02em]">This box is empty</h1>
+      <p className="mt-3 max-w-[440px] text-[15px] text-zinc-600 dark:text-zinc-400">
+        The page you requested does not exist. It may have moved, or the link might be out of date.
+      </p>
+      <div className="mt-7 flex flex-wrap justify-center gap-3">
+        <Link to="/" className="btn btn-primary btn-md">Back home</Link>
+        <Link to="/browse" className="btn btn-secondary btn-md">Browse items</Link>
+      </div>
+    </div>
+  );
+}
 
-      <footer className="border-t border-zinc-100 dark:border-zinc-800 mt-20">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid sm:grid-cols-4 gap-8">
-            <div className="sm:col-span-2">
-              <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">B</div><span className="font-display font-bold">BorrowBox</span></div>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-3 max-w-[360px]">Community lending platform. Borrow anything, anytime. Save money, reduce waste, meet neighbors. Built with love for sustainable sharing.</p>
-              <div className="flex gap-2 mt-4">
-                <span className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs font-medium">🌱 1.2t CO₂ saved</span>
-                <span className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs font-medium">📦 1.2k items</span>
-                <span className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs font-medium">⭐ 4.9/5 rating</span>
-              </div>
-            </div>
-            <div><h4 className="font-semibold text-sm">Platform</h4><ul className="mt-3 space-y-2 text-sm text-zinc-600 dark:text-zinc-400"><li><a href="/browse" className="hover:text-zinc-900 dark:hover:text-white">Browse items</a></li><li><a href="/list-item" className="hover:text-zinc-900 dark:hover:text-white">List an item</a></li><li><a href="/dashboard" className="hover:text-zinc-900 dark:hover:text-white">Dashboard</a></li><li><a href="http://localhost:5000/api-docs" target="_blank" className="hover:text-zinc-900 dark:hover:text-white">API Docs (Swagger)</a></li></ul></div>
-            <div><h4 className="font-semibold text-sm">Community</h4><ul className="mt-3 space-y-2 text-sm text-zinc-600 dark:text-zinc-400"><li>How it works</li><li>Safety & Trust</li><li>Sustainability</li><li>Contact: support@borrowbox.com</li></ul></div>
-          </div>
-          <div className="mt-12 pt-8 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row justify-between gap-4 text-xs text-zinc-500"><span>© 2024 BorrowBox. Community lending, reimagined. Built with 💜 for sharing economy.</span><span>Demo: admin@borrowbox.com / Admin@123 • demo@borrowbox.com / Demo@123</span></div>
-        </div>
-      </footer>
+function AppLayout() {
+  const { theme } = useTheme();
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Skip to main content
+      </a>
+
+      <Navbar />
+
+      <main id="main-content" className="flex-1">
+        <ErrorBoundary>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/browse" element={<Browse />} />
+              <Route path="/items/:id" element={<ItemDetail />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/users/:id" element={<Profile />} />
+
+              <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+              <Route path="/my-items" element={<RequireAuth><MyItems /></RequireAuth>} />
+              <Route path="/requests" element={<RequireAuth><Requests /></RequireAuth>} />
+              <Route path="/wishlist" element={<RequireAuth><Wishlist /></RequireAuth>} />
+              <Route path="/list-item" element={<RequireAuth><ListItem /></RequireAuth>} />
+              <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+              <Route path="/messages" element={<RequireAuth><Messages /></RequireAuth>} />
+
+              {INFO_PAGE_SLUGS.map((slug) => (
+                <Route key={slug} path={`/${slug}`} element={<InfoPage />} />
+              ))}
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
+      </main>
+
+      <Footer />
+
+      <Toaster
+        richColors
+        closeButton
+        theme={theme}
+        position="top-center"
+        toastOptions={{ style: { borderRadius: '14px' } }}
+      />
     </div>
   );
 }
@@ -66,10 +129,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <Toaster richColors position="top-center" />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppLayout />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

@@ -20,46 +20,135 @@ import messageRoutes from './routes/messages.js';
 
 const app = express();
 
-// Security & Middleware
-app.use(helmet({ crossOriginEmbedderPolicy: false }));
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'https://borrowbox.com'],
-  credentials: true
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
+const isProduction = process.env.NODE_ENV === 'production';
+const isTest = process.env.NODE_ENV === 'test';
 
-// Rate limiting
-const limiter = rateLimit({
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+/**
+ * Origins allowed to call the API with credentials.
+ * Localhost support keeps the Vite dev server and `vite preview` working, and
+ * API_ALLOWED_ORIGINS lets deployments add their own hosts.
+ */
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:4173',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://borrowbox.com',
+];
+
+const allowedOrigins = (process.env.API_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", ...defaultOrigins, ...allowedOrigins],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'self'", 'https:'],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
+    hsts: isProduction ? { maxAge: 63072000, includeSubDomains: true, preload: true } : false,
+  })
+);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Same-origin requests, curl and server-to-server calls send no origin.
+      if (!origin) return callback(null, true);
+      const allowlist = [...defaultOrigins, ...allowedOrigins];
+      if (allowlist.includes(origin) || (!isProduction && !origin)) return callback(null, true);
+      if (!isProduction && /^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(origin)) return callback(null, true);
+      return callback(new Error('Origin not allowed by CORS policy'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  })
+);
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+if (isProduction) {
+  app.use(morgan('combined', { skip: (req) => req.path === '/api/health' }));
+} else if (!isTest) {
+  app.use(morgan('dev'));
+}
+
+/* --------------------------------------------------------------- rate limits */
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: { success: false, message: 'Too many requests, please try again later' }
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' },
 });
-app.use('/api/', limiter);
 
-// Swagger Docs
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: `
-    .swagger-ui .topbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .swagger-ui .btn.execute { background: #8B5CF6; border-color: #8B5CF6; }
-  `,
-  customSiteTitle: 'BorrowBox API Docs',
-  customfavIcon: '📦'
-}));
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { success: false, message: 'Too many authentication attempts. Try again in a few minutes.' },
+});
+
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many write operations. Please try again later.' },
+});
+
+app.use('/api/', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use(['/api/items', '/api/borrow-requests', '/api/reviews', '/api/wishlist', '/api/messages'], writeLimiter);
+
+/* ------------------------------------------------------------- documentation */
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: `
+      .swagger-ui .topbar { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #06b6d4 100%); }
+      .swagger-ui .topbar .download-url-wrapper { display: none; }
+      .swagger-ui .btn.execute { background: #4f46e5; border-color: #4f46e5; }
+      .swagger-ui .info .title { font-weight: 700; }
+    `,
+    customSiteTitle: 'BorrowBox API documentation',
+  })
+);
 
 app.get('/api-docs.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
 
-// Health check
+/* ------------------------------------------------------------------- health */
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: '📦 BorrowBox API - Community Lending Platform',
+    message: 'BorrowBox API - community lending platform',
     version: '1.0.0',
     docs: '/api-docs',
+    health: '/api/health',
     endpoints: {
       auth: '/api/auth',
       users: '/api/users',
@@ -70,20 +159,21 @@ app.get('/', (req, res) => {
       notifications: '/api/notifications',
       wishlist: '/api/wishlist',
       dashboard: '/api/dashboard',
-      messages: '/api/messages'
+      messages: '/api/messages',
     },
-    demoAccounts: [
-      { email: 'admin@borrowbox.com', password: 'Admin@123', role: 'admin' },
-      { email: 'demo@borrowbox.com', password: 'Demo@123', role: 'user' }
-    ]
   });
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'API is running', timestamp: new Date().toISOString(), uptime: process.uptime() });
+  res.json({
+    success: true,
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: Math.round(process.uptime()),
+  });
 });
 
-// Routes
+/* ------------------------------------------------------------------- routes */
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -95,7 +185,6 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/messages', messageRoutes);
 
-// 404 & Error handler
 app.use(notFound);
 app.use(errorHandler);
 

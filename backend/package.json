@@ -1,13 +1,15 @@
 {
   "name": "borrowbox-backend",
   "version": "1.0.0",
-  "description": "BorrowBox - Community Lending Platform Backend - 100% Complete with Swagger",
+  "description": "BorrowBox community lending platform API (Express, JWT, Swagger)",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "seed": "node src/utils/seed.js"
+    "seed": "node scripts/seed.js",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

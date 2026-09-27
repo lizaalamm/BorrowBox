@@ -1,6 +1,7 @@
 import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { publicUser, publicItem } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -78,7 +79,8 @@ router.get('/stats', authenticate, (req, res) => {
         activeBorrows,
         activeLends,
         totalEarnings,
-        rating: req.user.rating
+        rating: req.user.rating,
+        verified: Boolean(req.user.verified)
       },
       recentActivity,
       monthlyData,
@@ -117,14 +119,12 @@ router.get('/admin', authenticate, authorize('admin'), (req, res) => {
   const recentUsers = [...storage.data.users]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5)
-    .map(u => {
-      const { password, ...safe } = u;
-      return safe;
-    });
+    .map(publicUser);
 
   const recentItems = [...storage.data.items]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5);
+    .slice(0, 5)
+    .map(publicItem);
 
   const monthlyGrowth = [];
   for (let i = 5; i >= 0; i--) {

@@ -11,23 +11,23 @@ const options = {
 
 **A complete, production-ready API for peer-to-peer item lending.**
 
-### Features:
-- 🔐 JWT Authentication & Authorization
-- 📦 Item Management (CRUD, Search, Filter, Categories)
-- 🤝 Borrow Request Workflow (Request → Approve → Borrowed → Return → Completed)
-- ⭐ Reviews & Ratings System
-- 🔔 Notifications System
-- ❤️ Wishlist / Favorites
-- 💬 Messaging System
-- 📊 Dashboard Analytics
-- 👑 Admin Panel
+### Features
+- JWT authentication and role based authorisation
+- Item management: CRUD, search, filters and categories
+- Borrow request workflow: request, approve, hand over, return, complete
+- Reviews and ratings
+- Notifications
+- Wishlist
+- Messaging
+- Dashboard analytics
+- Admin moderation endpoints
 
-### Authentication:
-Use \`Bearer <token>\` in Authorization header after login.
+### Authentication
+Send \`Authorization: Bearer <token>\` using the token returned by \`POST /api/auth/login\`.
 
-### Demo Accounts:
-- Admin: admin@borrowbox.com / Admin@123
-- User: demo@borrowbox.com / Demo@123
+### Development demo accounts
+- Admin: user1@borrowbox.com / Admin@123
+- Member: user2@borrowbox.com / Demo@123
       `,
       contact: {
         name: 'BorrowBox Team',
@@ -82,7 +82,7 @@ Use \`Bearer <token>\` in Authorization header after login.
             id: { type: 'string' },
             name: { type: 'string', example: 'Tools' },
             slug: { type: 'string', example: 'tools' },
-            icon: { type: 'string', example: '🔧' },
+            icon: { type: 'string', example: 'wrench' },
             color: { type: 'string', example: '#8B5CF6' },
             itemCount: { type: 'integer', example: 45 }
           }

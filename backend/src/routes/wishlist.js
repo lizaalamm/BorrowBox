@@ -1,6 +1,7 @@
 import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
+import { publicUser } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -14,9 +15,7 @@ const router = express.Router();
 function enrichWishlist(w) {
   const item = storage.findById('items', w.itemId);
   if (!item) return null;
-  const owner = storage.findById('users', item.ownerId);
-  const { password, ...safeOwner } = owner || {};
-  return { ...w, item: { ...item, owner: safeOwner } };
+  return { ...w, item: { ...item, owner: publicUser(storage.findById('users', item.ownerId)) } };
 }
 
 /**
