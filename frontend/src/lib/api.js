@@ -26,9 +26,12 @@ api.interceptors.response.use(
       localStorage.removeItem('borrowbox_token');
       localStorage.removeItem('borrowbox_user');
 
+      // Public pages stay browsable: only protected views bounce to sign in.
       const { pathname } = window.location;
-      const isAuthPage = pathname.includes('/login') || pathname.includes('/register');
-      if (!isAuthPage) window.location.assign('/login');
+      const protectedPrefixes = ['/dashboard', '/my-items', '/requests', '/wishlist', '/list-item', '/profile', '/messages'];
+      if (protectedPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+        window.location.assign('/login');
+      }
     }
 
     if (!error.response) {
@@ -85,6 +88,12 @@ export const notificationsAPI = {
   delete: (id) => api.delete(`/notifications/${id}`),
 };
 
+export const messagesAPI = {
+  getConversations: () => api.get('/messages/conversations'),
+  getThread: (conversationId) => api.get(`/messages/${conversationId}`),
+  send: (data) => api.post('/messages', data),
+};
+
 export const reviewsAPI = {
   getAll: (params) => api.get('/reviews', { params }),
   create: (data) => api.post('/reviews', data),
@@ -99,4 +108,5 @@ export const usersAPI = {
   getAll: (params) => api.get('/users', { params }),
   getById: (id) => api.get(`/users/${id}`),
   updateProfile: (data) => api.put('/users/profile/update', data),
+  changePassword: (data) => api.put('/users/profile/password', data),
 };

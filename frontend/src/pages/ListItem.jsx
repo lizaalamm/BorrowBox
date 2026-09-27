@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import { categoriesAPI, itemsAPI } from '../lib/api';
 import { toast } from 'sonner';
-import CategoryIcon from '../lib/categoryIcons';
 
 const CONDITIONS = ['New', 'Like New', 'Good', 'Fair'];
 

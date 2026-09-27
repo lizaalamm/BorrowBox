@@ -2,6 +2,7 @@ import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
 import { borrowRequestSchema, borrowStatusSchema } from '../utils/validation.js';
+import { publicBorrowRequest } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -12,18 +13,7 @@ const router = express.Router();
  *   description: Borrow request workflow
  */
 
-function enrichRequest(br) {
-  const item = storage.findById('items', br.itemId);
-  const borrower = storage.findById('users', br.borrowerId);
-  const owner = storage.findById('users', br.ownerId);
-  const safeBorrower = borrower ? (({ password, ...s }) => s)(borrower) : null;
-  const safeOwner = owner ? (({ password, ...s }) => s)(owner) : null;
-  const enrichedItem = item ? {
-    ...item,
-    owner: safeOwner
-  } : null;
-  return { ...br, item: enrichedItem, borrower: safeBorrower, owner: safeOwner };
-}
+const enrichRequest = publicBorrowRequest;
 
 /**
  * @swagger
@@ -121,6 +111,12 @@ router.post('/', authenticate, (req, res) => {
   }
   if (end < start) {
     return res.status(400).json({ success: false, message: 'The return date must be on or after the start date' });
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (start < today && req.user.role !== 'admin') {
+    return res.status(400).json({ success: false, message: 'The start date cannot be in the past' });
   }
 
   const item = storage.findById('items', value.itemId);
@@ -253,13 +249,13 @@ router.put('/:id/status', authenticate, (req, res) => {
   } else if (status === 'rejected') {
     notifUserId = br.borrowerId;
     notifType = 'request_rejected';
-    notifTitle = 'Request Declined';
+    notifTitle = 'Request declined';
     notifMessage = `Your request for ${item?.title} was declined`;
   } else if (status === 'borrowed') {
     notifUserId = br.borrowerId;
     notifType = 'system';
-    notifTitle = 'Item Borrowed';
-    notifMessage = `You have borrowed ${item?.title}. Enjoy!`;
+    notifTitle = 'Item borrowed';
+    notifMessage = `You have borrowed ${item?.title}. Return it by ${br.endDate}.`;
   } else if (status === 'returned') {
     notifUserId = br.ownerId;
     notifType = 'item_returned';
@@ -269,7 +265,12 @@ router.put('/:id/status', authenticate, (req, res) => {
     notifUserId = br.borrowerId;
     notifType = 'system';
     notifTitle = 'Borrow completed';
-    notifMessage = `Borrowing of ${item?.title} completed. Please leave a review!`;
+    notifMessage = `Borrowing of ${item?.title} is complete. You can now leave a review.`;
+  } else if (status === 'cancelled') {
+    notifUserId = br.ownerId;
+    notifType = 'system';
+    notifTitle = 'Request cancelled';
+    notifMessage = `${storage.findById('users', br.borrowerId)?.name} cancelled their request for ${item?.title}`;
   }
 
   if (notifUserId) {

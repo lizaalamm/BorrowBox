@@ -76,6 +76,11 @@ export default function Dashboard() {
 
   const { overview, recentActivity, monthlyData, topItems } = stats;
 
+  // Standing is derived from completed activity: five transactions per level.
+  const completedTransactions = (overview.totalLent || 0) + (overview.totalBorrowed || 0);
+  const level = Math.max(1, Math.floor(completedTransactions / 5) + 1);
+  const levelProgress = Math.min(100, Math.round(((completedTransactions % 5) / 5) * 100));
+
   const cards = [
     {
       Icon: Package,
@@ -330,9 +335,9 @@ export default function Dashboard() {
                 <Award className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
               </span>
               <div>
-                <p className="text-[13.5px] font-bold text-amber-900 dark:text-amber-100">Level 3 explorer</p>
+                <p className="text-[13.5px] font-bold text-amber-900 dark:text-amber-100">Level {level} neighbour</p>
                 <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
-                  {(overview.totalLent || 0) + (overview.totalBorrowed || 0)} completed transactions
+                  {completedTransactions} completed transactions
                 </p>
               </div>
             </div>
@@ -352,11 +357,14 @@ export default function Dashboard() {
 
             <div className="mt-5">
               <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                <span>Next level</span>
-                <span>65%</span>
+                <span>Progress to level {level + 1}</span>
+                <span>{levelProgress}%</span>
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                <div className="h-full w-[65%] rounded-full bg-gradient-to-r from-amber-500 to-orange-500" />
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
+                  style={{ width: `${levelProgress}%` }}
+                />
               </div>
             </div>
           </div>

@@ -61,6 +61,11 @@ export const profileUpdateSchema = Joi.object({
   avatar: Joi.string().max(500).allow('').uri({ scheme: ['http', 'https'] }).optional(),
 }).min(1);
 
+export const passwordChangeSchema = Joi.object({
+  currentPassword: Joi.string().min(8).max(100).required(),
+  newPassword: strongPassword.required(),
+});
+
 export const itemSchema = Joi.object({
   title: safeString(100).min(3).required(),
   description: safeString(2000).min(10).required(),
@@ -72,7 +77,7 @@ export const itemSchema = Joi.object({
   location: safeString(200).min(2).required(),
   tags: Joi.array().items(Joi.string().max(30)).max(15).optional(),
   images: Joi.array().items(Joi.string().uri({ scheme: ['http', 'https'] }).max(500)).max(6).optional(),
-});
+}).or('category', 'categoryId');
 
 export const itemUpdateSchema = Joi.object({
   title: safeString(100).min(3).optional(),

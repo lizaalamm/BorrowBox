@@ -2,6 +2,7 @@ import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
 import { reviewSchema } from '../utils/validation.js';
+import { publicReview } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -40,11 +41,7 @@ router.get('/', (req, res) => {
 
   reviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  const enriched = reviews.map(r => {
-    const reviewer = storage.findById('users', r.reviewerId);
-    const { password, ...safe } = reviewer || {};
-    return { ...r, reviewer: safe || null };
-  });
+  const enriched = reviews.map(publicReview);
 
   res.json({ success: true, data: enriched });
 });
@@ -78,13 +75,17 @@ router.post('/', authenticate, (req, res) => {
   const item = storage.findById('items', value.itemId);
   if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
 
-  // Check if user borrowed this item and completed
+  // Reviews are only open to people who actually borrowed the item.
   const borrowHistory = storage.findOne('borrowRequests', br =>
-    br.itemId === value.itemId && br.borrowerId === req.user.id && ['completed', 'returned', 'borrowed'].includes(br.status)
+    br.itemId === value.itemId &&
+    br.borrowerId === req.user.id &&
+    ['returned', 'completed'].includes(br.status)
   );
   if (!borrowHistory && req.user.role !== 'admin') {
-    // Allow review if not borrowed? For demo, allow but warn
-    // return res.status(400).json({ success: false, message: 'You must borrow item before reviewing' });
+    return res.status(403).json({
+      success: false,
+      message: 'You can review this item once your borrow is complete',
+    });
   }
 
   const existing = storage.findOne('reviews', r => r.itemId === value.itemId && r.reviewerId === req.user.id);

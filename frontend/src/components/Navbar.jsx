@@ -116,6 +116,7 @@ export default function Navbar() {
     { path: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     { path: '/my-items', label: 'My items', Icon: Package },
     { path: '/requests', label: 'Requests', Icon: ShoppingBag },
+    { path: '/messages', label: 'Messages', Icon: MessageSquare },
     { path: '/wishlist', label: 'Wishlist', Icon: Heart },
   ].filter((link) => link.public || user);
 
@@ -383,6 +384,7 @@ export default function Navbar() {
                           { to: '/profile', label: 'Profile', Icon: UserRound },
                           { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
                           { to: '/my-items', label: 'My items', Icon: Package },
+                          { to: '/messages', label: 'Messages', Icon: MessageSquare },
                           { to: '/wishlist', label: 'Wishlist', Icon: Heart },
                         ].map(({ to, label, Icon }) => (
                           <Link

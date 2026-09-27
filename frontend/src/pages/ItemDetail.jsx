@@ -488,13 +488,24 @@ export default function ItemDetail() {
                     </span>
                   </div>
                 </div>
-                <Link
-                  to={`/users/${item.ownerId}`}
-                  aria-label={`View ${item.owner?.name} profile`}
-                  className="icon-btn flex-shrink-0 border border-border"
-                >
-                  <UserRound className="h-4 w-4" aria-hidden="true" />
-                </Link>
+                <div className="flex flex-shrink-0 items-center gap-2">
+                  <Link
+                    to={`/users/${item.ownerId}`}
+                    aria-label={`View ${item.owner?.name} profile`}
+                    className="icon-btn border border-border"
+                  >
+                    <UserRound className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                  {!isOwner && user && (
+                    <Link
+                      to={`/messages?to=${item.ownerId}&item=${item.id}`}
+                      aria-label={`Message ${item.owner?.name}`}
+                      className="icon-btn border border-border"
+                    >
+                      <MessageSquare className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
 

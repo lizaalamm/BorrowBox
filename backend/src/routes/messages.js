@@ -2,6 +2,7 @@ import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
 import { messageSchema } from '../utils/validation.js';
+import { publicUser } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -31,9 +32,9 @@ router.get('/conversations', authenticate, (req, res) => {
     const otherId = m.senderId === userId ? m.receiverId : m.senderId;
     const key = [userId, otherId].sort().join('_') + (m.itemId ? `_${m.itemId}` : '');
     if (!convMap.has(key) || new Date(m.createdAt) > new Date(convMap.get(key).lastMessage.createdAt)) {
-      const otherUser = storage.findById('users', otherId);
+      const otherUser = publicUser(storage.findById('users', otherId));
       const item = m.itemId ? storage.findById('items', m.itemId) : null;
-      const { password, ...safeOther } = otherUser || {};
+      const safeOther = otherUser;
       convMap.set(key, {
         conversationId: key,
         otherUser: safeOther,

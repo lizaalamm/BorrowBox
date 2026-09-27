@@ -35,6 +35,7 @@ page application built on Tailwind CSS, Lucide icons and Recharts.
 - Role based access control: `user` and `admin`
 - Public member profiles with rating, lending history and reviews
 - Self-service profile editing: name, bio, neighbourhood and avatar
+- Password change with current-password confirmation
 
 **Listings**
 
@@ -64,6 +65,7 @@ borrowed -> overdue -> returned
 - Wishlist with idempotent add/remove
 - In-app notifications with read tracking
 - Borrow history with a review flow after completion
+- Private member-to-member messaging with per-item threads and unread counts
 - Dashboard with activity chart, pending requests, top performing items and reputation
 
 **Interface**
@@ -134,8 +136,8 @@ Useful URLs:
 | `http://localhost:5000/api-docs`     | Swagger UI documentation  |
 | `http://localhost:5000/api-docs.json`| OpenAPI document          |
 
-To let existing accounts carry their seed data, delete `backend/data/db.json` and restart the
-server. The file is regenerated on boot.
+To start from a clean demo database run `npm run seed` inside `backend/`, or delete
+`backend/data/db.json` and restart the server; the file is regenerated on boot.
 
 ---
 
@@ -184,7 +186,7 @@ All endpoints are documented interactively at `/api-docs`. Summary:
 | Module          | Endpoints                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------ |
 | Auth            | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/auth/demo-accounts` |
-| Users           | `GET /api/users`, `GET /api/users/:id`, `PUT /api/users/profile/update`, `PUT /api/users/:id/verify` |
+| Users           | `GET /api/users`, `GET /api/users/:id`, `PUT /api/users/profile/update`, `PUT /api/users/profile/password`, `PUT /api/users/:id/verify` |
 | Categories      | `GET /api/categories`, `GET /api/categories/:id`, `POST /api/categories`, `DELETE /api/categories/:id` |
 | Items           | `GET /api/items`, `GET /api/items/featured`, `GET /api/items/my-items`, `GET|POST|PUT|DELETE /api/items/:id` |
 | Borrow requests | `GET /api/borrow-requests`, `GET /api/borrow-requests/:id`, `POST /api/borrow-requests`, `PUT /api/borrow-requests/:id/status`, `DELETE /api/borrow-requests/:id` |
@@ -221,6 +223,8 @@ curl -s http://localhost:5000/api/dashboard/stats -H "Authorization: Bearer $TOK
 - Pagination and filter inputs clamped, so oversized queries cannot exhaust memory
 - Error responses never leak stack traces in production
 - Public endpoints exclude email addresses unless the caller is an administrator
+- Demo credentials endpoint is disabled when `NODE_ENV=production`
+- Reviews are only accepted from members who returned the item, and only once per item
 
 ---
 
@@ -245,22 +249,24 @@ curl -s http://localhost:5000/api/dashboard/stats -H "Authorization: Bearer $TOK
 BorrowBox/
 ├── backend/
 │   ├── src/
+│   ├── scripts/            seed script for resetting the demo database
+│   ├── src/
 │   │   ├── config/         storage (JSON persistence + seed) and Swagger definition
 │   │   ├── middleware/     authentication, authorisation, error handling
 │   │   ├── routes/         auth, users, categories, items, borrow requests, reviews,
 │   │   │                   notifications, wishlist, messages, dashboard
-│   │   ├── utils/          Joi schemas and input sanitisation helpers
+│   │   ├── utils/          Joi schemas, sanitisers and response serialisers
 │   │   ├── app.js          Express application, security middleware and routing
 │   │   └── server.js       process bootstrap, graceful shutdown
 │   └── data/               generated JSON database (git ignored)
 └── frontend/
     ├── public/             favicon and static assets
     └── src/
-        ├── components/     Logo, Navbar, Footer, ItemCard
-        ├── context/        AuthContext with token persistence
-        ├── lib/            API client, category icon registry, theme hook
+        ├── components/     Logo, Navbar, Footer, ItemCard, ErrorBoundary
+        ├── context/        AuthContext (token persistence) and ThemeContext
+        ├── lib/            API client and category icon registry
         ├── pages/          Home, Browse, ItemDetail, ListItem, Dashboard, MyItems,
-        │                   Requests, Wishlist, Profile, Login, Register, InfoPage
+        │                   Requests, Wishlist, Messages, Profile, Login, Register, InfoPage
         ├── App.jsx         routing, layout, 404 handling
         └── index.css       design tokens and component utilities
 ```
@@ -273,6 +279,7 @@ BorrowBox/
 | --------- | --------------- | ---------------------------------------- |
 | backend   | `npm run dev`   | Start with file watching                 |
 | backend   | `npm start`     | Start the API server                     |
+| backend   | `npm run seed`  | Reset `data/db.json` and reseed demo data |
 | frontend  | `npm run dev`   | Start the Vite dev server on port 5173    |
 | frontend  | `npm run build` | Production build into `frontend/dist`     |
 | frontend  | `npm run preview` | Serve the production build on port 4173 |

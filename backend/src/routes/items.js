@@ -2,6 +2,7 @@ import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
 import { itemSchema, itemUpdateSchema, clampInt, clampNumber } from '../utils/validation.js';
+import { publicUser, publicItem, publicReview } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -12,29 +13,8 @@ const router = express.Router();
  *   description: Item management - core of BorrowBox
  */
 
-/** Public owner payload: never expose credentials or contact details. */
-function safeUser(user) {
-  if (!user) return null;
-  const { password, email, ...rest } = user;
-  return rest;
-}
-
-function enrichReview(review) {
-  return {
-    ...review,
-    reviewer: safeUser(storage.findById('users', review.reviewerId)),
-    reviewee: safeUser(storage.findById('users', review.revieweeId)),
-  };
-}
-
-function enrichItem(item) {
-  const category = storage.findById('categories', item.categoryId) || storage.findOne('categories', c => c.name === item.category);
-  return {
-    ...item,
-    owner: safeUser(storage.findById('users', item.ownerId)),
-    categoryDetails: category || null
-  };
-}
+const enrichItem = publicItem;
+const enrichReview = publicReview;
 
 /**
  * @swagger
@@ -184,7 +164,15 @@ router.get('/:id', (req, res) => {
   const reviews = storage
     .find('reviews', r => r.itemId === item.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .map(enrichReview);
+    .map((review) => {
+      const reviewer = storage.findById('users', review.reviewerId);
+      return {
+        ...review,
+        reviewer: reviewer
+          ? { id: reviewer.id, name: reviewer.name, avatar: reviewer.avatar, verified: reviewer.verified }
+          : null,
+      };
+    });
   const related = storage.find('items', i => i.categoryId === item.categoryId && i.id !== item.id).slice(0, 4).map(enrichItem);
   res.json({ success: true, data: { ...enriched, reviews, relatedItems: related } });
 });
@@ -222,22 +210,19 @@ router.post('/', authenticate, (req, res) => {
   const { error, value } = itemSchema.validate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
-  let categoryId = value.categoryId || '';
-  let categoryName = value.category || '';
-  if (!categoryId) {
-    const cat = storage.findOne('categories', c => c.name.toLowerCase() === value.category.toLowerCase() || c.slug === value.category.toLowerCase());
-    if (cat) {
-      categoryId = cat.id;
-      categoryName = cat.name;
-    } else {
-      // create uncategorized? use first
-      categoryId = storage.data.categories[0]?.id;
-      categoryName = storage.data.categories[0]?.name || value.category;
-    }
-  } else {
-    const cat = storage.findById('categories', categoryId);
-    if (cat) categoryName = cat.name;
+  // Resolve the category from an id, a slug or a display name.
+  const requestedName = (value.category || '').trim().toLowerCase();
+  const match = storage.findOne(
+    'categories',
+    (c) => c.id === value.categoryId || (requestedName && (c.slug === requestedName || c.name.toLowerCase() === requestedName))
+  );
+
+  if (!match) {
+    return res.status(400).json({ success: false, message: 'Please choose a valid category' });
   }
+
+  const categoryId = match.id;
+  const categoryName = match.name;
 
   const item = storage.create('items', {
     title: value.title,
@@ -257,10 +242,6 @@ router.post('/', authenticate, (req, res) => {
     borrowCount: 0,
     featured: false
   });
-
-  // Update user stats
-  const user = storage.findById('users', req.user.id);
-  if (user) storage.update('users', req.user.id, { totalLends: (user.totalLends || 0) + 0 });
 
   res.status(201).json({ success: true, message: 'Item listed successfully', data: enrichItem(item) });
 });
@@ -304,7 +285,23 @@ router.put('/:id', authenticate, (req, res) => {
   const { error, value } = itemUpdateSchema.validate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
-  const updated = storage.update('items', req.params.id, value);
+  const updates = { ...value };
+
+  // A changed category name or id always resolves back to a known category.
+  if (updates.category || updates.categoryId) {
+    const requestedName = (updates.category || '').trim().toLowerCase();
+    const match = storage.findOne(
+      'categories',
+      (c) => c.id === updates.categoryId || (requestedName && (c.slug === requestedName || c.name.toLowerCase() === requestedName))
+    );
+    if (!match) {
+      return res.status(400).json({ success: false, message: 'Please choose a valid category' });
+    }
+    updates.categoryId = match.id;
+    updates.category = match.name;
+  }
+
+  const updated = storage.update('items', req.params.id, updates);
   res.json({ success: true, message: 'Item updated', data: enrichItem(updated) });
 });
 

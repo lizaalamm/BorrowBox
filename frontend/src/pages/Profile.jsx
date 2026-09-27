@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  Award, BadgeCheck, Calendar, Heart, MapPin, Package, Pencil, Save,
+  Award, BadgeCheck, Calendar, Heart, KeyRound, MapPin, Package, Pencil, Save,
   ShieldCheck, Star, TrendingUp, X,
 } from 'lucide-react';
 import { usersAPI } from '../lib/api';
@@ -20,6 +20,8 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', bio: '', location: '', avatar: '' });
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const isSelf = Boolean(currentUser && profile && currentUser.id === profile.id);
 
@@ -49,6 +51,33 @@ export default function Profile() {
       cancelled = true;
     };
   }, [userId]);
+
+  const changePassword = async (event) => {
+    event.preventDefault();
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('The new passwords do not match');
+      return;
+    }
+    if (passwordForm.newPassword.length < 8) {
+      toast.error('Use at least 8 characters for the new password');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      await usersAPI.changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      toast.success('Password updated');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not update your password');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const startEditing = () => {
     setForm({
@@ -262,6 +291,72 @@ export default function Profile() {
                 {saving ? 'Saving' : 'Save changes'}
               </button>
             </div>
+          </form>
+        )}
+
+        {/* Security */}
+        {isSelf && (
+          <form onSubmit={changePassword} className="card mt-6 p-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                <KeyRound className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="font-display text-[16px] font-semibold">Password and security</h2>
+                <p className="text-[13px] text-zinc-500 dark:text-zinc-400">
+                  Use a unique password you do not use anywhere else.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="label" htmlFor="current-password">Current password</label>
+                <input
+                  id="current-password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={passwordForm.currentPassword}
+                  onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="new-password">New password</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={passwordForm.newPassword}
+                  onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="confirm-password">Confirm new password</label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(event) => setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })}
+                  className="input"
+                />
+              </div>
+            </div>
+
+            <p className="mt-3 text-[12px] text-zinc-500 dark:text-zinc-400">
+              Must be at least 8 characters and include an uppercase letter, a lowercase letter and a number.
+            </p>
+
+            <button type="submit" disabled={changingPassword} className="btn btn-primary btn-md mt-5">
+              {changingPassword ? 'Updating password' : 'Update password'}
+            </button>
           </form>
         )}
 

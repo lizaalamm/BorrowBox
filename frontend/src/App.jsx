@@ -20,6 +20,7 @@ const Requests = lazy(() => import('./pages/Requests'));
 const Wishlist = lazy(() => import('./pages/Wishlist'));
 const ListItem = lazy(() => import('./pages/ListItem'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Messages = lazy(() => import('./pages/Messages'));
 const InfoPage = lazy(() => import('./pages/InfoPage'));
 
 const INFO_PAGE_SLUGS = [
@@ -104,6 +105,7 @@ function AppLayout() {
               <Route path="/wishlist" element={<RequireAuth><Wishlist /></RequireAuth>} />
               <Route path="/list-item" element={<RequireAuth><ListItem /></RequireAuth>} />
               <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+              <Route path="/messages" element={<RequireAuth><Messages /></RequireAuth>} />
 
               {INFO_PAGE_SLUGS.map((slug) => (
                 <Route key={slug} path={`/${slug}`} element={<InfoPage />} />

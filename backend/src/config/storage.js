@@ -158,11 +158,12 @@ class Storage {
 
     const categoryBySlug = (slug) => this.data.categories.find((category) => category.slug === slug);
 
+    // Short handles for the four seeded personas.
     const owner = {
-      manager: ids['user1@borrowbox.com'],
-      maker: ids['user2@borrowbox.com'],
-      photographer: ids['user3@borrowbox.com'],
-      outdoors: ids['user4@borrowbox.com']
+      user1: ids['user1@borrowbox.com'],
+      user2: ids['user2@borrowbox.com'],
+      user3: ids['user3@borrowbox.com'],
+      user4: ids['user4@borrowbox.com']
     };
 
     this.data.items = [
@@ -176,7 +177,7 @@ class Storage {
           'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=900&q=80',
           'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=900&q=80'
         ],
-        ownerId: owner.maker,
+        ownerId: owner.user2,
         condition: 'Like New',
         value: 199,
         lendingFee: 0,
@@ -199,7 +200,7 @@ class Storage {
           'https://images.unsplash.com/photo-1510127034890-ba27508e9f1c?w=900&q=80',
           'https://images.unsplash.com/photo-1452780212940-6f5c84d7fa94?w=900&q=80'
         ],
-        ownerId: owner.photographer,
+        ownerId: owner.user3,
         condition: 'Good',
         value: 1800,
         lendingFee: 25,
@@ -222,7 +223,7 @@ class Storage {
           'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=900&q=80',
           'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=900&q=80'
         ],
-        ownerId: owner.outdoors,
+        ownerId: owner.user4,
         condition: 'Good',
         value: 450,
         lendingFee: 15,
@@ -242,7 +243,7 @@ class Storage {
         category: 'Books',
         categoryId: categoryBySlug('books').id,
         images: ['https://images.unsplash.com/photo-1512820790803-83ca734da794?w=900&q=80'],
-        ownerId: owner.photographer,
+        ownerId: owner.user3,
         condition: 'Good',
         value: 800,
         lendingFee: 0,
@@ -262,7 +263,7 @@ class Storage {
         category: 'Home',
         categoryId: categoryBySlug('home').id,
         images: ['https://images.unsplash.com/photo-1585237672814-8f85a8118bf6?w=900&q=80'],
-        ownerId: owner.maker,
+        ownerId: owner.user2,
         condition: 'Like New',
         value: 379,
         lendingFee: 0,
@@ -282,7 +283,7 @@ class Storage {
         category: 'Party',
         categoryId: categoryBySlug('party').id,
         images: ['https://images.unsplash.com/photo-1545454675-3531b543be5d?w=900&q=80'],
-        ownerId: owner.manager,
+        ownerId: owner.user1,
         condition: 'Good',
         value: 320,
         lendingFee: 10,
@@ -302,7 +303,7 @@ class Storage {
         category: 'Sports',
         categoryId: categoryBySlug('sports').id,
         images: ['https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=900&q=80'],
-        ownerId: owner.outdoors,
+        ownerId: owner.user4,
         condition: 'Good',
         value: 950,
         lendingFee: 20,
@@ -322,7 +323,7 @@ class Storage {
         category: 'Clothing',
         categoryId: categoryBySlug('clothing').id,
         images: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=900&q=80'],
-        ownerId: owner.photographer,
+        ownerId: owner.user3,
         condition: 'Like New',
         value: 1200,
         lendingFee: 35,
@@ -348,8 +349,8 @@ class Storage {
       {
         id: uuidv4(),
         itemId: drill.id,
-        borrowerId: owner.photographer,
-        ownerId: owner.maker,
+        borrowerId: owner.user3,
+        ownerId: owner.user2,
         status: 'pending',
         startDate: new Date(now + 1000 * 60 * 60 * 24).toISOString().split('T')[0],
         endDate: new Date(now + 1000 * 60 * 60 * 24 * 4).toISOString().split('T')[0],
@@ -360,8 +361,8 @@ class Storage {
       {
         id: uuidv4(),
         itemId: mixer.id,
-        borrowerId: owner.photographer,
-        ownerId: owner.maker,
+        borrowerId: owner.user3,
+        ownerId: owner.user2,
         status: 'borrowed',
         startDate: new Date(now - 1000 * 60 * 60 * 24 * 2).toISOString().split('T')[0],
         endDate: new Date(now + 1000 * 60 * 60 * 24 * 2).toISOString().split('T')[0],
@@ -376,8 +377,8 @@ class Storage {
       {
         id: uuidv4(),
         itemId: drill.id,
-        reviewerId: owner.photographer,
-        revieweeId: owner.maker,
+        reviewerId: owner.user3,
+        revieweeId: owner.user2,
         rating: 5,
         comment: 'Drill was in perfect condition and the handover was easy. Clear instructions on the bits too.',
         type: 'item',
@@ -386,8 +387,8 @@ class Storage {
       {
         id: uuidv4(),
         itemId: this.data.items[1].id,
-        reviewerId: owner.outdoors,
-        revieweeId: owner.photographer,
+        reviewerId: owner.user4,
+        revieweeId: owner.user3,
         rating: 5,
         comment: 'Camera arrived spotless with everything charged. Great tips on settings for low light.',
         type: 'item',
@@ -398,7 +399,7 @@ class Storage {
     this.data.notifications = [
       {
         id: uuidv4(),
-        userId: owner.maker,
+        userId: owner.user2,
         type: 'borrow_request',
         title: 'New borrow request',
         message: 'User 3 wants to borrow your DeWalt 20V Cordless Drill Kit.',
@@ -408,7 +409,7 @@ class Storage {
       },
       {
         id: uuidv4(),
-        userId: owner.photographer,
+        userId: owner.user3,
         type: 'request_approved',
         title: 'Request approved',
         message: 'Your request for the KitchenAid Stand Mixer was approved.',
@@ -419,25 +420,25 @@ class Storage {
     ];
 
     this.data.wishlists = [
-      { id: uuidv4(), userId: owner.photographer, itemId: drill.id, createdAt: new Date().toISOString() },
-      { id: uuidv4(), userId: owner.maker, itemId: this.data.items[1].id, createdAt: new Date().toISOString() }
+      { id: uuidv4(), userId: owner.user3, itemId: drill.id, createdAt: new Date().toISOString() },
+      { id: uuidv4(), userId: owner.user2, itemId: this.data.items[1].id, createdAt: new Date().toISOString() }
     ];
 
     this.data.messages = [
       {
         id: uuidv4(),
-        conversationId: [owner.maker, owner.photographer].sort().join('_'),
-        senderId: owner.photographer,
-        receiverId: owner.maker,
+        conversationId: [owner.user2, owner.user3].sort().join('_'),
+        senderId: owner.user3,
+        receiverId: owner.user2,
         itemId: drill.id,
         text: 'Hi, is the drill still free this weekend?',
         createdAt: new Date(now - 1000 * 60 * 30).toISOString()
       },
       {
         id: uuidv4(),
-        conversationId: [owner.maker, owner.photographer].sort().join('_'),
-        senderId: owner.maker,
-        receiverId: owner.photographer,
+        conversationId: [owner.user2, owner.user3].sort().join('_'),
+        senderId: owner.user2,
+        receiverId: owner.user3,
         itemId: drill.id,
         text: 'Yes, it is available. Friday after 6pm works well for pickup.',
         createdAt: new Date(now - 1000 * 60 * 20).toISOString()
@@ -490,4 +491,5 @@ class Storage {
 }
 
 const storage = new Storage();
+export { DB_PATH };
 export default storage;

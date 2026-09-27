@@ -1,7 +1,9 @@
 import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { profileUpdateSchema, clampInt } from '../utils/validation.js';
+import bcrypt from 'bcryptjs';
+import { profileUpdateSchema, passwordChangeSchema, clampInt } from '../utils/validation.js';
+import { publicUser, publicItem, publicReview } from '../utils/serializers.js';
 
 const router = express.Router();
 
@@ -38,9 +40,9 @@ router.get('/', authenticate, (req, res) => {
   const isAdmin = req.user.role === 'admin';
 
   let users = storage.data.users.map((user) => {
-    const { password, email, ...safe } = user;
+    const safe = publicUser(user);
     // Contact details are only exposed to administrators.
-    return isAdmin ? { ...safe, email } : safe;
+    return isAdmin ? { ...safe, email: user.email } : safe;
   });
 
   if (search) {
@@ -78,11 +80,18 @@ router.get('/', authenticate, (req, res) => {
 router.get('/:id', (req, res) => {
   const user = storage.findById('users', req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-  const { password, ...rest } = user;
-  const safeUser = req.user?.role === 'admin' ? rest : (({ email, ...publicFields }) => publicFields)(rest);
-  const userItems = storage.find('items', i => i.ownerId === user.id);
-  const userReviews = storage.find('reviews', r => r.revieweeId === user.id);
-  res.json({ success: true, data: { ...safeUser, items: userItems, reviews: userReviews } });
+
+  const userItems = storage
+    .find('items', (i) => i.ownerId === user.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map(publicItem);
+  const userReviews = storage
+    .find('reviews', (r) => r.revieweeId === user.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map(publicReview);
+
+  // Email addresses stay private, including on your own public profile page.
+  res.json({ success: true, data: { ...publicUser(user), items: userItems, reviews: userReviews } });
 });
 
 /**
@@ -111,8 +120,48 @@ router.put('/profile/update', authenticate, (req, res) => {
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
   const updated = storage.update('users', req.user.id, value);
-  const { password, ...safe } = updated;
-  res.json({ success: true, message: 'Profile updated', data: safe });
+  res.json({ success: true, message: 'Profile updated', data: publicUser(updated) });
+});
+
+/**
+ * @swagger
+ * /api/users/profile/password:
+ *   put:
+ *     summary: Change the current user password
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Password updated }
+ *       400: { description: Current password is incorrect }
+ */
+router.put('/profile/password', authenticate, async (req, res) => {
+  const { error, value } = passwordChangeSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+
+  const user = storage.findById('users', req.user.id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+  const matches = await bcrypt.compare(value.currentPassword, user.password);
+  if (!matches) {
+    return res.status(400).json({ success: false, message: 'Your current password is incorrect' });
+  }
+
+  const sameAsBefore = await bcrypt.compare(value.newPassword, user.password);
+  if (sameAsBefore) {
+    return res.status(400).json({ success: false, message: 'Choose a password you have not used before' });
+  }
+
+  storage.update('users', user.id, { password: await bcrypt.hash(value.newPassword, 10) });
+  storage.create('notifications', {
+    userId: user.id,
+    type: 'system',
+    title: 'Password updated',
+    message: 'Your BorrowBox password was changed. If this was not you, contact support immediately.',
+    relatedId: user.id,
+    read: false,
+  });
+
+  res.json({ success: true, message: 'Password updated successfully' });
 });
 
 /**
@@ -134,8 +183,7 @@ router.put('/:id/verify', authenticate, authorize('admin'), (req, res) => {
   const user = storage.findById('users', req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   const updated = storage.update('users', req.params.id, { verified: true });
-  const { password, ...safe } = updated;
-  res.json({ success: true, message: 'User verified', data: safe });
+  res.json({ success: true, message: 'User verified', data: publicUser(updated) });
 });
 
 export default router;
