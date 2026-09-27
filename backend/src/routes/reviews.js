@@ -115,7 +115,7 @@ router.post('/', authenticate, (req, res) => {
   storage.create('notifications', {
     userId: item.ownerId,
     type: 'new_review',
-    title: 'New Review ⭐',
+    title: 'New review received',
     message: `${req.user.name} left a ${value.rating}-star review for ${item.title}`,
     relatedId: review.id,
     read: false

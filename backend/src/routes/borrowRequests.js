@@ -1,7 +1,7 @@
 import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
-import { borrowRequestSchema } from '../utils/validation.js';
+import { borrowRequestSchema, borrowStatusSchema } from '../utils/validation.js';
 
 const router = express.Router();
 
@@ -114,6 +114,15 @@ router.post('/', authenticate, (req, res) => {
   const { error, value } = borrowRequestSchema.validate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
+  const start = new Date(value.startDate);
+  const end = new Date(value.endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return res.status(400).json({ success: false, message: 'Invalid borrow dates' });
+  }
+  if (end < start) {
+    return res.status(400).json({ success: false, message: 'The return date must be on or after the start date' });
+  }
+
   const item = storage.findById('items', value.itemId);
   if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
   if (item.ownerId === req.user.id) return res.status(400).json({ success: false, message: 'Cannot borrow your own item' });
@@ -122,9 +131,7 @@ router.post('/', authenticate, (req, res) => {
   const existingPending = storage.findOne('borrowRequests', r => r.itemId === value.itemId && r.borrowerId === req.user.id && r.status === 'pending');
   if (existingPending) return res.status(400).json({ success: false, message: 'You already have a pending request for this item' });
 
-  const start = new Date(value.startDate);
-  const end = new Date(value.endDate);
-  const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 1;
+  const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
   const totalFee = (item.lendingFee || 0) * days;
 
   const br = storage.create('borrowRequests', {
@@ -143,7 +150,7 @@ router.post('/', authenticate, (req, res) => {
   storage.create('notifications', {
     userId: item.ownerId,
     type: 'borrow_request',
-    title: 'New Borrow Request 📥',
+    title: 'New borrow request',
     message: `${req.user.name} wants to borrow your ${item.title}`,
     relatedId: br.id,
     read: false
@@ -178,7 +185,9 @@ router.post('/', authenticate, (req, res) => {
  *       200: { description: Status updated }
  */
 router.put('/:id/status', authenticate, (req, res) => {
-  const { status, ownerMessage } = req.body;
+  const { error, value } = borrowStatusSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+  const { status, ownerMessage } = value;
   const validTransitions = {
     pending: ['approved', 'rejected', 'cancelled'],
     approved: ['borrowed', 'cancelled'],
@@ -239,7 +248,7 @@ router.put('/:id/status', authenticate, (req, res) => {
   if (status === 'approved') {
     notifUserId = br.borrowerId;
     notifType = 'request_approved';
-    notifTitle = 'Request Approved! 🎉';
+    notifTitle = 'Request approved';
     notifMessage = `Your request for ${item?.title} was approved by owner`;
   } else if (status === 'rejected') {
     notifUserId = br.borrowerId;
@@ -254,12 +263,12 @@ router.put('/:id/status', authenticate, (req, res) => {
   } else if (status === 'returned') {
     notifUserId = br.ownerId;
     notifType = 'item_returned';
-    notifTitle = 'Item Returned 📦';
+    notifTitle = 'Item returned';
     notifMessage = `${storage.findById('users', br.borrowerId)?.name} returned ${item?.title}`;
   } else if (status === 'completed') {
     notifUserId = br.borrowerId;
     notifType = 'system';
-    notifTitle = 'Transaction Completed ✅';
+    notifTitle = 'Borrow completed';
     notifMessage = `Borrowing of ${item?.title} completed. Please leave a review!`;
   }
 

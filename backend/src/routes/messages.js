@@ -1,6 +1,7 @@
 import express from 'express';
 import storage from '../config/storage.js';
 import { authenticate } from '../middleware/auth.js';
+import { messageSchema } from '../utils/validation.js';
 
 const router = express.Router();
 
@@ -101,8 +102,9 @@ router.get('/:conversationId', authenticate, (req, res) => {
  *       201: { description: Message sent }
  */
 router.post('/', authenticate, (req, res) => {
-  const { receiverId, text, itemId } = req.body;
-  if (!receiverId || !text) return res.status(400).json({ success: false, message: 'receiverId and text required' });
+  const { error, value } = messageSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+  const { receiverId, text, itemId } = value;
 
   const receiver = storage.findById('users', receiverId);
   if (!receiver) return res.status(404).json({ success: false, message: 'Receiver not found' });

@@ -78,7 +78,8 @@ router.get('/stats', authenticate, (req, res) => {
         activeBorrows,
         activeLends,
         totalEarnings,
-        rating: req.user.rating
+        rating: req.user.rating,
+        verified: Boolean(req.user.verified)
       },
       recentActivity,
       monthlyData,

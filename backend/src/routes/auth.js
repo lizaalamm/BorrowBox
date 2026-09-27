@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import storage from '../config/storage.js';
+import storage, { DEMO_ACCOUNTS } from '../config/storage.js';
 import { registerSchema, loginSchema } from '../utils/validation.js';
 import { generateToken, authenticate } from '../middleware/auth.js';
 
@@ -28,7 +28,7 @@ const router = express.Router();
  *             required: [name, email, password]
  *             properties:
  *               name: { type: string, example: "John Doe" }
- *               email: { type: string, format: email, example: "john@example.com" }
+ *               email: { type: string, format: email, example: "new.member@example.com" }
  *               password: { type: string, example: "Password@123" }
  *               location: { type: string, example: "San Francisco, CA" }
  *               bio: { type: string, example: "DIY enthusiast" }
@@ -78,7 +78,7 @@ router.post('/register', async (req, res) => {
  *             type: object
  *             required: [email, password]
  *             properties:
- *               email: { type: string, example: "demo@borrowbox.com" }
+ *               email: { type: string, example: "user2@borrowbox.com" }
  *               password: { type: string, example: "Demo@123" }
  *     responses:
  *       200: { description: Login successful }
@@ -117,7 +117,7 @@ router.get('/me', authenticate, (req, res) => {
  * @swagger
  * /api/auth/demo-accounts:
  *   get:
- *     summary: Get demo accounts for testing
+ *     summary: Get the development demo accounts
  *     tags: [Auth]
  *     responses:
  *       200: { description: Demo accounts }
@@ -125,12 +125,13 @@ router.get('/me', authenticate, (req, res) => {
 router.get('/demo-accounts', (req, res) => {
   res.json({
     success: true,
-    data: [
-      { role: 'Admin', email: 'admin@borrowbox.com', password: 'Admin@123', description: 'Full admin access' },
-      { role: 'User (Demo)', email: 'demo@borrowbox.com', password: 'Demo@123', description: 'Regular user with items' },
-      { role: 'User', email: 'alice@example.com', password: 'User@123', description: 'Another user' },
-      { role: 'User', email: 'bob@example.com', password: 'User@123', description: 'Outdoor enthusiast' }
-    ]
+    data: DEMO_ACCOUNTS.map((account) => ({
+      role: account.role,
+      name: account.name,
+      email: account.email,
+      password: account.password,
+      description: account.description,
+    })),
   });
 });
 
