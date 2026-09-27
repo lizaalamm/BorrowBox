@@ -1,259 +1,284 @@
-# 📦 BorrowBox — Community Lending, Reimagined
+# BorrowBox - Community Lending Platform
 
-> **The most beautiful, production-ready peer-to-peer lending platform.** Save money, reduce waste, meet neighbors. A complete full-stack project with Swagger, premium UI, and 100% module coverage.
+BorrowBox is a full-stack neighbourhood lending marketplace. Members list the tools, gear and
+equipment they already own, neighbours request them for a set of dates, and both sides build
+reputation through reviews after a successful return.
 
-![BorrowBox Hero](https://images.unsplash.com/photo-1504148455328-c376907d081c?w=1200)
-
----
-
-## ✨ Why BorrowBox Stands Out
-
-**BorrowBox isn't just another CRUD app — it's a meticulously crafted product that feels like a real startup:**
-
-- 🎨 **Outstanding UI**: Glassmorphism, gradient meshes, bento grids, micro-interactions, Framer Motion — designed to impress
-- 📚 **Swagger First**: Complete OpenAPI 3.0 documentation at `/api-docs` with every endpoint documented
-- 🧩 **Perfectly Modular**: 10+ backend modules, 8+ frontend pages, clean separation of concerns
-- 🚀 **Production Ready**: JWT auth, validation, rate limiting, error handling, notifications, real workflows
-- 🌱 **Impact Driven**: Tracks CO₂ saved, money saved, community impact — more than just lending
+The repository contains a production-shaped Express API with JSON persistence and a React single
+page application built on Tailwind CSS, Lucide icons and Recharts.
 
 ---
 
-## 🏗️ Architecture
+## Table of contents
+
+1. [Feature overview](#feature-overview)
+2. [Architecture](#architecture)
+3. [Tech stack](#tech-stack)
+4. [Quick start](#quick-start)
+5. [Environment variables](#environment-variables)
+6. [Demo accounts](#demo-accounts)
+7. [API surface](#api-surface)
+8. [Security model](#security-model)
+9. [Design system](#design-system)
+10. [Project structure](#project-structure)
+11. [Scripts](#scripts)
+12. [License](#license)
+
+---
+
+## Feature overview
+
+**Members and accounts**
+
+- Email and password registration with password strength rules
+- JWT sessions (HS256, 7 day expiry, issuer checked on every request)
+- Role based access control: `user` and `admin`
+- Public member profiles with rating, lending history and reviews
+- Self-service profile editing: name, bio, neighbourhood and avatar
+
+**Listings**
+
+- Create, edit, pause and delete listings
+- Categories with real icon keys (no glyph characters stored in data)
+- Condition, replacement value and optional per-day lending fee
+- Up to six photos per listing with a generated cover
+- Search, filtering by category, condition, availability and value range, plus sorting and pagination
+
+**Borrowing workflow**
+
+```
+pending -> approved -> borrowed -> returned -> completed
+pending -> rejected
+pending/approved -> cancelled
+borrowed -> overdue -> returned
+```
+
+- Date and message validation before a request is sent
+- Owner notifications for new requests, reviews and status changes
+- Role aware transitions: only owners can approve or hand over, only borrowers can return or cancel
+- Item availability updates automatically as the request progresses
+
+**Discovery and engagement**
+
+- Featured listings on the home page
+- Wishlist with idempotent add/remove
+- In-app notifications with read tracking
+- Borrow history with a review flow after completion
+- Dashboard with activity chart, pending requests, top performing items and reputation
+
+**Interface**
+
+- Responsive marketing site with hero, categories, featured items, how-it-works, trust, impact,
+  testimonials and FAQ sections
+- Light and dark themes with system preference detection
+- Route level code splitting and accessible, keyboard friendly components
+- Custom brand mark and favicon rendered from inline SVG
+
+---
+
+## Architecture
+
+```
+frontend (React + Vite, port 5173)
+        |
+        |  /api/*  (relative requests, proxied by Vite in development)
+        v
+backend (Express, port 5000)
+        |
+        v
+data/db.json (atomic JSON persistence, auto-seeded on first run)
+```
+
+The browser always calls the API through a relative `/api` path. In development the Vite dev server
+proxies those calls to the Express server, which keeps the app working behind proxies and inside
+embedded previews without exposing internal ports.
+
+---
+
+## Tech stack
+
+| Layer      | Technology                                                                  |
+| ---------- | --------------------------------------------------------------------------- |
+| Frontend   | React 18, Vite 5, React Router 6, Tailwind CSS 3, Framer Motion, Recharts, Lucide, Sonner |
+| Backend    | Node.js, Express 4, Joi validation, jsonwebtoken, bcryptjs, helmet, express-rate-limit, morgan, Multer, Swagger UI |
+| Persistence| JSON file storage with in-memory caching                                     |
+
+No external database is required. The API seeds demo data the first time it starts.
+
+---
+
+## Quick start
+
+Requirements: Node.js 18 or newer.
+
+```bash
+# 1. Backend
+cd backend
+npm install
+cp .env.example .env          # optional, sensible defaults apply
+npm run dev                   # http://localhost:5000
+
+# 2. Frontend (new terminal)
+cd frontend
+npm install
+cp .env.example .env          # optional
+npm run dev                   # http://localhost:5173
+```
+
+Useful URLs:
+
+| URL                                  | Description               |
+| ------------------------------------ | ------------------------- |
+| `http://localhost:5173`              | Web application           |
+| `http://localhost:5000/api/health`   | API health check          |
+| `http://localhost:5000/api-docs`     | Swagger UI documentation  |
+| `http://localhost:5000/api-docs.json`| OpenAPI document          |
+
+To let existing accounts carry their seed data, delete `backend/data/db.json` and restart the
+server. The file is regenerated on boot.
+
+---
+
+## Environment variables
+
+### backend/.env
+
+| Variable               | Default             | Purpose                                                        |
+| ---------------------- | ------------------- | -------------------------------------------------------------- |
+| `PORT`                 | `5000`              | HTTP port                                                      |
+| `HOST`                 | `0.0.0.0`           | Bind address                                                   |
+| `NODE_ENV`             | `development`       | Enables strict logging, CORS and error behaviour in production  |
+| `JWT_SECRET`           | dev fallback        | Signing secret, required and 32+ characters in production       |
+| `API_ALLOWED_ORIGINS`  | empty               | Extra comma separated origins allowed by CORS                   |
+| `DB_PATH`              | `backend/data/db.json` | Alternative storage location                                 |
+
+### frontend/.env
+
+| Variable       | Default | Purpose                                                            |
+| -------------- | ------- | ------------------------------------------------------------------ |
+| `VITE_API_URL` | `/api`  | API base URL. Keep it relative so proxies and previews keep working |
+
+---
+
+## Demo accounts
+
+The seed data creates four members. Credentials are development fixtures only; change them before
+exposing the API publicly.
+
+| Role   | Email                 | Password    | Notes                                  |
+| ------ | --------------------- | ----------- | -------------------------------------- |
+| Admin  | `user1@borrowbox.com` | `Admin@123` | Moderation endpoints and verification  |
+| Member | `user2@borrowbox.com` | `Demo@123`  | Owns several listings and requests     |
+| Member | `user3@borrowbox.com` | `User@123`  | Camera gear and books                  |
+| Member | `user4@borrowbox.com` | `User@123`  | Outdoor equipment                      |
+
+The sign-in screen can autofill the first two accounts, and `GET /api/auth/demo-accounts` returns
+the same list.
+
+---
+
+## API surface
+
+All endpoints are documented interactively at `/api-docs`. Summary:
+
+| Module          | Endpoints                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| Auth            | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/auth/demo-accounts` |
+| Users           | `GET /api/users`, `GET /api/users/:id`, `PUT /api/users/profile/update`, `PUT /api/users/:id/verify` |
+| Categories      | `GET /api/categories`, `GET /api/categories/:id`, `POST /api/categories`, `DELETE /api/categories/:id` |
+| Items           | `GET /api/items`, `GET /api/items/featured`, `GET /api/items/my-items`, `GET|POST|PUT|DELETE /api/items/:id` |
+| Borrow requests | `GET /api/borrow-requests`, `GET /api/borrow-requests/:id`, `POST /api/borrow-requests`, `PUT /api/borrow-requests/:id/status`, `DELETE /api/borrow-requests/:id` |
+| Reviews         | `GET /api/reviews`, `POST /api/reviews`, `DELETE /api/reviews/:id`                          |
+| Notifications   | `GET /api/notifications`, `PUT /api/notifications/:id/read`, `PUT /api/notifications/read-all`, `DELETE /api/notifications/:id` |
+| Wishlist        | `GET /api/wishlist`, `POST /api/wishlist/:itemId`, `DELETE /api/wishlist/:itemId`, `GET /api/wishlist/check/:itemId` |
+| Messages        | `GET /api/messages/conversations`, `GET /api/messages/:conversationId`, `POST /api/messages` |
+| Dashboard       | `GET /api/dashboard/stats`, `GET /api/dashboard/admin`                                      |
+| Health          | `GET /api/health`                                                                          |
+
+Example request:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:5000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"user2@borrowbox.com","password":"Demo@123"}' | jq -r '.data.token')
+
+curl -s http://localhost:5000/api/dashboard/stats -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+## Security model
+
+- Passwords hashed with bcrypt (10 rounds) and never returned in responses
+- JWT sessions signed with HS256, an explicit issuer and a 7 day expiry; the user record is re-read
+  on every request so role changes and deletions take effect immediately
+- Joi validation with sanitisation on every write endpoint: tag characters and control codes are
+  stripped, string lengths and numeric ranges are bounded, URI fields must be http(s)
+- Ownership checks on items, requests, messages, notifications, wishlist entries and reviews
+- Rate limiting: 300 requests per 15 minutes per IP on the API, 30 on authentication, 120 writes
+- `helmet` security headers with a scoped content security policy, HSTS in production
+- CORS allowlist driven by `API_ALLOWED_ORIGINS` in production, permissive only for localhost in development
+- Pagination and filter inputs clamped, so oversized queries cannot exhaust memory
+- Error responses never leak stack traces in production
+- Public endpoints exclude email addresses unless the caller is an administrator
+
+---
+
+## Design system
+
+- **Typography**: Space Grotesk for display, Plus Jakarta Sans for body text
+- **Colour**: indigo brand scale (`brand-50` to `brand-900`), zinc neutrals, semantic success,
+  warning and danger tones; all colours expressed as HSL CSS variables with a dark theme
+- **Components**: `.btn`, `.card`, `.input`, `.select`, `.chip`, `.badge-pill`, `.skeleton` and
+  related utilities defined once in `frontend/src/index.css`
+- **Iconography**: Lucide only. Categories store icon keys (`wrench`, `tent`, `book-open`, ...) that
+  resolve through `frontend/src/lib/categoryIcons.jsx`
+- **Brand**: `frontend/src/components/Logo.jsx` renders the mark and wordmark; `frontend/public/favicon.svg`
+  provides the browser icon
+- **Imagery**: listing photography comes from Unsplash URLs stored in the data layer
+
+---
+
+## Project structure
 
 ```
 BorrowBox/
-├── backend/               # Node.js + Express API
+├── backend/
 │   ├── src/
-│   │   ├── config/        # Swagger + Storage (JSON persistence + in-memory)
-│   │   ├── middleware/    # Auth, Error handling
-│   │   ├── routes/        # 10 modules: auth, users, categories, items, borrow-requests, reviews, notifications, wishlist, dashboard, messages
-│   │   ├── utils/         # Validation (Joi), helpers
-│   │   ├── app.js         # Express app with helmet, cors, morgan, rate-limit
-│   │   └── server.js      # Entry point
-│   └── data/              # JSON DB (auto-seeded)
-│
-├── frontend/              # React + Vite + Tailwind
-│   ├── src/
-│   │   ├── components/    # Navbar (premium), ItemCard (glass, hover), etc.
-│   │   ├── pages/         # Home (hero with orbs), Browse (filters), ItemDetail (borrow flow), Dashboard (charts), MyItems, Requests, Wishlist, ListItem, Profile, Login, Register
-│   │   ├── context/       # AuthContext with JWT
-│   │   ├── lib/           # Axios API client + all endpoints
-│   │   ├── App.jsx        # Routing + layout + footer
-│   │   └── index.css      # Tailwind + custom utilities (glass, gradient-mesh, text-gradient, glow)
-│   └── ...
+│   │   ├── config/         storage (JSON persistence + seed) and Swagger definition
+│   │   ├── middleware/     authentication, authorisation, error handling
+│   │   ├── routes/         auth, users, categories, items, borrow requests, reviews,
+│   │   │                   notifications, wishlist, messages, dashboard
+│   │   ├── utils/          Joi schemas and input sanitisation helpers
+│   │   ├── app.js          Express application, security middleware and routing
+│   │   └── server.js       process bootstrap, graceful shutdown
+│   └── data/               generated JSON database (git ignored)
+└── frontend/
+    ├── public/             favicon and static assets
+    └── src/
+        ├── components/     Logo, Navbar, Footer, ItemCard
+        ├── context/        AuthContext with token persistence
+        ├── lib/            API client, category icon registry, theme hook
+        ├── pages/          Home, Browse, ItemDetail, ListItem, Dashboard, MyItems,
+        │                   Requests, Wishlist, Profile, Login, Register, InfoPage
+        ├── App.jsx         routing, layout, 404 handling
+        └── index.css       design tokens and component utilities
 ```
 
 ---
 
-## 🧩 Modules — 100% Complete
+## Scripts
 
-### Backend Modules (10)
-
-| Module | Endpoints | Features |
-|--------|-----------|----------|
-| **Auth** | `/register`, `/login`, `/me`, `/demo-accounts` | Bcrypt, JWT (7d), validation, demo accounts |
-| **Users** | `GET /`, `GET /:id`, `PUT /profile/update`, `PUT /:id/verify` | Profiles, verification, stats |
-| **Categories** | `GET /`, `GET /:id`, `POST /`, `DELETE /:id` | 8 seeded categories with icons/colors, item counts |
-| **Items** | `GET /` (search, filter, sort, pagination), `GET /featured`, `GET /my-items`, `GET /:id` (with reviews + related), `POST /`, `PUT /:id`, `DELETE /:id` | Full CRUD, availability states, tags, images, owner enrichment |
-| **Borrow Requests** | `GET /`, `GET /:id`, `POST /`, `PUT /:id/status`, `DELETE /:id` | Workflow: pending → approved → borrowed → returned → completed (with validations, notifications, item availability updates) |
-| **Reviews** | `GET /`, `POST /`, `DELETE /:id` | Ratings, auto-updates item & user avg rating |
-| **Notifications** | `GET /`, `PUT /:id/read`, `PUT /read-all`, `DELETE /:id` | Types: borrow_request, approved, rejected, returned, new_review |
-| **Wishlist** | `GET /`, `POST /:itemId`, `DELETE /:itemId`, `GET /check/:itemId` | Favorites |
-| **Dashboard** | `GET /stats` (user), `GET /admin` (admin) | Overview, monthly charts, top items, recent activity, totals, growth |
-| **Messages** | `GET /conversations`, `GET /:conversationId`, `POST /` | Simple messaging with item context |
-
-### Frontend Pages (11)
-
-| Page | Highlights |
-|------|------------|
-| **Home** | Hero with floating orbs, gradient mesh, stats bar, category grid, featured items, bento How-it-works, CTA |
-| **Browse** | Search, category pills, filters (condition, availability, sort), active filter chips, grid/list view, skeletons |
-| **Item Detail** | Image gallery, condition badge, availability, owner card, borrow modal with date calculation & fees, related items, reviews |
-| **Dashboard** | Greeting, 4 stat cards, AreaChart (recharts) for 6 months, recent activity, top performing, quick actions, level |
-| **My Items** | Manage listings, availability badge, edit/delete, stats |
-| **Requests** | Tabs: All / My Borrows / My Lends + status filter, workflow actions (approve, borrowed, returned, complete) |
-| **Wishlist** | Saved items grid |
-| **List Item** | Form with validation, category select, tags, images URLs, pro tips |
-| **Profile** | Cover gradient, avatar, verified badge, stats, items, reviews |
-| **Login / Register** | Split screen, demo autofill, glass side panel with metrics |
+| Location  | Command         | Description                              |
+| --------- | --------------- | ---------------------------------------- |
+| backend   | `npm run dev`   | Start with file watching                 |
+| backend   | `npm start`     | Start the API server                     |
+| frontend  | `npm run dev`   | Start the Vite dev server on port 5173    |
+| frontend  | `npm run build` | Production build into `frontend/dist`     |
+| frontend  | `npm run preview` | Serve the production build on port 4173 |
 
 ---
 
-## 📚 Swagger API Docs
+## License
 
-Swagger is **first-class**:
-
-- **URL**: `http://localhost:5000/api-docs`
-- **JSON**: `http://localhost:5000/api-docs.json`
-- **Features**: 
-  - All 40+ endpoints documented with JSDoc
-  - Schemas: User, Item, Category, BorrowRequest, Review, Notification, Error, Success
-  - Security: Bearer JWT
-  - Demo accounts in description
-  - Custom CSS (gradient topbar)
-
-**Example: Try it out directly in Swagger UI!**
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+
-
-### 1. Clone
-```bash
-git clone https://github.com/lizaalamm/BorrowBox.git
-cd BorrowBox
-```
-
-### 2. Backend
-```bash
-cd backend
-npm install
-npm run dev    # http://localhost:5000
-# Swagger: http://localhost:5000/api-docs
-```
-
-**Backend auto-seeds:**
-- 4 users (admin, demo, alice, bob)
-- 8 categories
-- 8 items (tools, electronics, camping, books, etc.)
-- Borrow requests, reviews, notifications, wishlists, messages
-
-**Demo Accounts:**
-- Admin: `admin@borrowbox.com` / `Admin@123`
-- User: `demo@borrowbox.com` / `Demo@123`
-- Alice: `alice@example.com` / `User@123`
-- Bob: `bob@example.com` / `User@123`
-
-### 3. Frontend
-```bash
-cd ../frontend
-npm install
-npm run dev    # http://localhost:5173
-```
-
-Vite proxy forwards `/api` to `http://localhost:5000` automatically.
-
-### 4. Build
-```bash
-# Frontend production build
-npm run build
-npm run preview
-```
-
----
-
-## 🎨 UI Design System — Why It Stands Out
-
-- **Typography**: Space Grotesk (display) + Plus Jakarta Sans (body) — premium pairing
-- **Colors**: Violet → Indigo → Cyan gradient as primary, zinc neutral base, semantic colors for conditions
-- **Effects**:
-  - Glassmorphism: `backdrop-blur-xl` + `bg-white/70` + border
-  - Gradient Mesh: 6 radial gradients for hero depth
-  - Shadow Glow: `0 0 40px rgba(139,92,246,0.25)`
-  - Shimmer on hover, float animation for orbs
-  - Bento grid layout for How-it-works
-- **Components**:
-  - Navbar: Sticky, blur on scroll, pill navigation, notification dropdown with unread, profile hover card
-  - ItemCard: 24px radius, aspect 4/3, condition & availability badges, wishlist heart with scale, owner avatar ring, hover lift + shimmer
-  - No generic UI — every page feels custom
-
----
-
-## 🔐 Security & Best Practices
-
-- **Helmet** for security headers
-- **CORS** configured
-- **Rate limiting** (200 req / 15 min)
-- **Morgan** logging
-- **Joi** validation on all inputs
-- **Bcrypt** (10 rounds) for passwords
-- **JWT** with 7d expiry, Bearer scheme
-- **Role-based** access (user, admin)
-- **Error handler** middleware with stack in dev
-- **Axios interceptors** for 401 auto-logout
-
----
-
-## 🌍 Deployment Ready
-
-- **Backend**: `0.0.0.0` host, `PORT` env, JSON persistence (no external DB needed)
-- **Frontend**: Vite build, proxy config, preview host `0.0.0.0`
-- **Env**: `VITE_API_URL` optional, defaults to `http://localhost:5000/api`
-
----
-
-## 📦 API Examples
-
-### Register
-```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"John","email":"john@example.com","password":"Password@123"}'
-```
-
-### Get Items with Filters
-```bash
-curl "http://localhost:5000/api/items?category=tools&availability=available&sortBy=popular&page=1&limit=12"
-```
-
-### Borrow Request (auth required)
-```bash
-curl -X POST http://localhost:5000/api/borrow-requests \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"itemId":"...","startDate":"2024-02-01","endDate":"2024-02-05","message":"Need for project"}'
-```
-
----
-
-## 🤝 Borrow Workflow
-
-```
-User browses → Views item → Clicks "Request to Borrow" → Selects dates + message → Owner gets notification → Owner Approves/Rejects → If approved: item reserved → Owner marks Borrowed → Borrower uses → Borrower marks Returned → Owner marks Completed → Both can review → Ratings update
-```
-
-All state transitions validated server-side.
-
----
-
-## 📊 Impact
-
-- **Save Money**: Avg user saves $847/year
-- **Reduce Waste**: One shared drill = 20 less manufactured
-- **Build Community**: 2.4k neighbors, 4.9★ trust
-- **Track CO₂**: 1.2 tons saved this month
-
----
-
-## 🛠️ Tech Stack
-
-**Backend**: Node.js, Express, JWT, Bcrypt, Joi, Swagger (swagger-jsdoc + swagger-ui-express), Helmet, Morgan, CORS, Rate Limit, UUID, Multer (ready)
-
-**Frontend**: React 18, Vite, React Router 6, Tailwind CSS, Framer Motion, Lucide Icons, Recharts, Axios, Sonner (toasts)
-
-**No external DB required** — JSON file persistence + in-memory with auto-seed for zero-config demo.
-
----
-
-## 📝 License
-
-MIT — Feel free to use for portfolio, learning, or startup!
-
----
-
-## 🙏 Credits
-
-Built with 💜 by BorrowBox Team. Designed to stand out from typical lending apps — every pixel considered, every module complete, Swagger everywhere, UI that wows.
-
-**Live Demo Credentials**: Use demo cards on login page for instant access.
-
----
-
-## 🔗 Links
-
-- Swagger: `http://localhost:5000/api-docs`
-- Frontend: `http://localhost:5173`
-- Backend Health: `http://localhost:5000/api/health`
+MIT. See the repository for details.
