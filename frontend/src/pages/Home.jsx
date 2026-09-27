@@ -116,8 +116,10 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* ------------------------------------------------------------------ hero */}
-      <section className="relative isolate overflow-x-clip border-b border-border">
-        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+      {/* No overflow clipping on the section itself: the hero must never crop
+          its own content. Only the decorative layer is clipped. */}
+      <section className="relative isolate border-b border-border">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
           <div className="absolute inset-0 grid-backdrop [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,black,transparent)]" />
           <div className="glow-brand absolute inset-x-0 top-0 h-[460px]" />
         </div>
